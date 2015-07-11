@@ -150,6 +150,27 @@ int main(int argc, char **argv)
 
 			fclose(icon);
 
+		} else if (!strcmp(path, "/dwarves")) {
+			char body[1024];
+
+			EnterCriticalSection(&world_instance.lock);
+			int status = render_dwarves(world_instance.world, body);
+			LeaveCriticalSection(&world_instance.lock);
+
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+
+		
 		} else if (sscanf(path, "/entity/%d", &id) == 1) {
 			char body[1024];
 

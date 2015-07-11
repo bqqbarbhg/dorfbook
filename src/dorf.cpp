@@ -27,6 +27,24 @@ void world_tick(World *world)
 	}
 }
 
+int render_dwarves(World *world, char *buffer)
+{
+	char *ptr = buffer;
+	ptr += sprintf(ptr, "<html><head><title>Dwarves</title></head>");
+	ptr += sprintf(ptr, "<body><ul>\n");
+	for (U32 i = 0; i < Count(world->dwarves); i++) {
+		Dwarf *dwarf = &world->dwarves[i];
+		if (dwarf->id == 0)
+			continue;
+
+		ptr += sprintf(ptr, "<li><a href=\"/entity/%d\">%s</a></li>\n",
+				dwarf->id, dwarf->name);
+	}
+	ptr += sprintf(ptr, "</ul></body></html>\n");
+
+	return 200;
+}
+
 int render_entity(World *world, U32 id, char *buffer)
 {
 	char *ptr = buffer;
