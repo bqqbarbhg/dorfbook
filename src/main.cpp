@@ -171,7 +171,7 @@ int main(int argc, char **argv)
 			send(client_socket, body, (int)strlen(body), 0);
 
 		
-		} else if (sscanf(path, "/entity/%d", &id) == 1) {
+		} else if (sscanf(path, "/entities/%d", &id) == 1) {
 			char body[1024];
 
 			EnterCriticalSection(&world_instance.lock);

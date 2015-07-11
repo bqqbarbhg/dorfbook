@@ -37,7 +37,7 @@ int render_dwarves(World *world, char *buffer)
 		if (dwarf->id == 0)
 			continue;
 
-		ptr += sprintf(ptr, "<li><a href=\"/entity/%d\">%s</a></li>\n",
+		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a></li>\n",
 				dwarf->id, dwarf->name);
 	}
 	ptr += sprintf(ptr, "</ul></body></html>\n");
