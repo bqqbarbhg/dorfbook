@@ -118,8 +118,8 @@ int main(int argc, char **argv)
 		Dwarf *dwarf = &world.dwarves[id];
 		dwarf->id = id;
 		dwarf->name = name;
-		dwarf->hunger = 20;
-		dwarf->sleep = 30;
+		dwarf->hunger = rand() % 50;
+		dwarf->sleep = rand() % 50;
 	}
 
 	WorldInstance world_instance = { 0 };

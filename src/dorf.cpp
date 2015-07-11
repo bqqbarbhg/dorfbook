@@ -6,12 +6,29 @@ typedef uint32_t U32;
 typedef int64_t I64;
 #define Count(array) (sizeof(array)/sizeof(*(array)))
 
+enum Activity
+{
+	Activity_Idle,
+	Activity_Eat,
+	Activity_Sleep,
+};
+
+struct Activity_Info
+{
+	const char *description;
+} activity_infos[] = {
+	{ "Idling" },
+	{ "Eating" },
+	{ "Sleeping" },
+};
+
 struct Dwarf
 {
 	U32 id;
 	const char *name;
 	I32 hunger;
 	I32 sleep;
+	Activity activity;
 };
 
 struct World
@@ -25,6 +42,32 @@ void world_tick(World *world)
 		Dwarf *dwarf = &world->dwarves[i];
 		dwarf->hunger++;
 		dwarf->sleep++;
+
+		switch (dwarf->activity) {
+
+		case Activity_Idle:
+			if (dwarf->sleep > 50) {
+				dwarf->activity = Activity_Sleep;
+			} else if (dwarf->hunger > 50) {
+				dwarf->activity = Activity_Eat;
+			}
+			break;
+
+		case Activity_Eat:
+			dwarf->hunger -= 3;
+			if (dwarf->hunger < 5) {
+				dwarf->activity = Activity_Idle;
+			}
+			break;
+
+		case Activity_Sleep:
+			dwarf->sleep -= 3;
+			if (dwarf->sleep < 5) {
+				dwarf->activity = Activity_Idle;
+			}
+			break;
+
+		}
 	}
 }
 
@@ -64,7 +107,8 @@ int render_entity(World *world, U32 id, char *buffer)
 
 	ptr += sprintf(ptr, "<html><head><title>%s</title></head>", dwarf->name);
 	ptr += sprintf(ptr, "<body><h1>%s</h1>", dwarf->name); 
-	ptr += sprintf(ptr, "<h2>Hunger: %d, sleep: %d</h2>", dwarf->hunger, dwarf->sleep); 
+	ptr += sprintf(ptr, "<h2>%s</h2>", activity_infos[dwarf->activity].description); 
+	ptr += sprintf(ptr, "<h3>Hunger: %d, sleep: %d</h3>", dwarf->hunger, dwarf->sleep); 
 	ptr += sprintf(ptr, "</body></html>"); 
 
 	return 200;
