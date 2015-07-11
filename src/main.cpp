@@ -6,6 +6,23 @@
 
 SOCKET server_socket;
 
+struct HTTP_Status_Description {
+	int status_code;
+	const char *description;
+} http_status_descriptions[] = {
+	{ 200, "OK" },
+	{ 404, "Not found" },
+};
+
+const char *get_http_status_description(int status_code) {
+	for (U32 i = 0; i < Count(http_status_descriptions); i++) {
+		if (http_status_descriptions[i].status_code == status_code) {
+			return http_status_descriptions[i].description;
+		}
+	}
+	return "Unknown";
+}
+
 void handle_kill(int signal)
 {
 	puts("server is kill");
@@ -42,6 +59,12 @@ int main(int argc, char **argv)
 
 	freeaddrinfo(addr);
 
+	World world = { 0 };
+	world.dwarves[0].id = 1;
+	world.dwarves[0].name = "Urist";
+	world.dwarves[0].hunger = 20;
+	world.dwarves[0].sleep = 30;
+
 	for (;;) {
 		SOCKET client_socket = accept(server_socket, NULL, NULL);
 		if (client_socket == INVALID_SOCKET)
@@ -56,6 +79,8 @@ int main(int argc, char **argv)
 		sscanf(buffer, "%s %s %s\r\n", method, path, http_version);
 
 		printf("Request to path %s\n", path);
+
+		U32 id;
 
 		if (!strcmp(path, "/favicon.ico")) {
 			puts("Serving favicon");
@@ -84,6 +109,23 @@ int main(int argc, char **argv)
 			}
 
 			fclose(icon);
+
+		} else if (sscanf(path, "/entity/%d", &id) == 1) {
+			char body[1024];
+			int status = render_entity(&world, id, body);
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+
 		} else {
 			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
 
