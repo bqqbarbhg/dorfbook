@@ -60,7 +60,7 @@ int main(int argc, char **argv)
 		if (!strcmp(path, "/favicon.ico")) {
 			puts("Serving favicon");
 
-			FILE *icon = fopen("icon.ico", "rb");
+			FILE *icon = fopen("data/icon.ico", "rb");
 			fseek(icon, 0, SEEK_END);
 			int size = ftell(icon);
 			fseek(icon, 0, SEEK_SET);
@@ -70,7 +70,6 @@ int main(int argc, char **argv)
 			sprintf(content_length, "Content-Length: %d\r\n", size);
 			const char *content_type = "Content-Type: image/x-icon\r\n";
 			const char *separator = "\r\n";
-
 
 			send(client_socket, response_start, (int)strlen(response_start), 0);
 			send(client_socket, content_length, (int)strlen(content_length), 0);
