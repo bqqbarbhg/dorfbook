@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <time.h>
 
 SOCKET server_socket;
 
@@ -38,7 +39,18 @@ struct WorldInstance
 {
 	World *world;
 	CRITICAL_SECTION lock;
+	time_t last_updated;
 };
+
+void update_to_now(WorldInstance *world_instance)
+{
+	time_t now = time(NULL);
+	while (world_instance->last_updated < now) {
+		printf("Updating world to tick %u\n", world_instance->last_updated);
+		world_tick(world_instance->world);
+		world_instance->last_updated++;
+	}
+}
 
 DWORD WINAPI UpdateThread(void *world_instance_ptr)
 {
@@ -46,9 +58,9 @@ DWORD WINAPI UpdateThread(void *world_instance_ptr)
 
 	for (;;) {
 		EnterCriticalSection(&world_instance->lock);
-		world_tick(world_instance->world);
+		update_to_now(world_instance);
 		LeaveCriticalSection(&world_instance->lock);
-		Sleep(1000);
+		Sleep(10000);
 	}
 }
 
@@ -100,6 +112,7 @@ int main(int argc, char **argv)
 	}
 
 	WorldInstance world_instance = { 0 };
+	world_instance.last_updated = time(NULL);
 	world_instance.world = &world;
 	InitializeCriticalSection(&world_instance.lock);
 
@@ -154,6 +167,7 @@ int main(int argc, char **argv)
 			char body[1024];
 
 			EnterCriticalSection(&world_instance.lock);
+			update_to_now(&world_instance);
 			int status = render_dwarves(world_instance.world, body);
 			LeaveCriticalSection(&world_instance.lock);
 
@@ -175,6 +189,7 @@ int main(int argc, char **argv)
 			char body[1024];
 
 			EnterCriticalSection(&world_instance.lock);
+			update_to_now(&world_instance);
 			int status = render_entity(world_instance.world, id, body);
 			LeaveCriticalSection(&world_instance.lock);
 
