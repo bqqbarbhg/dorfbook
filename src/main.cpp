@@ -33,6 +33,24 @@ void handle_kill(int signal)
 	exit(0);
 }
 
+struct WorldInstance
+{
+	World *world;
+	CRITICAL_SECTION lock;
+};
+
+DWORD WINAPI UpdateThread(void *world_instance_ptr)
+{
+	WorldInstance *world_instance = (WorldInstance*)world_instance_ptr;
+
+	for (;;) {
+		EnterCriticalSection(&world_instance->lock);
+		world_tick(world_instance->world);
+		LeaveCriticalSection(&world_instance->lock);
+		Sleep(1000);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	WSADATA wsadata;
@@ -65,9 +83,13 @@ int main(int argc, char **argv)
 	world.dwarves[0].hunger = 20;
 	world.dwarves[0].sleep = 30;
 
-	for (;;) {
-		world_tick(&world);
+	WorldInstance world_instance = { 0 };
+	world_instance.world = &world;
+	InitializeCriticalSection(&world_instance.lock);
 
+	CreateThread(NULL, NULL, UpdateThread, &world_instance, NULL, NULL);
+
+	for (;;) {
 		SOCKET client_socket = accept(server_socket, NULL, NULL);
 		if (client_socket == INVALID_SOCKET)
 			continue;
@@ -114,7 +136,11 @@ int main(int argc, char **argv)
 
 		} else if (sscanf(path, "/entity/%d", &id) == 1) {
 			char body[1024];
-			int status = render_entity(&world, id, body);
+
+			EnterCriticalSection(&world_instance.lock);
+			int status = render_entity(world_instance.world, id, body);
+			LeaveCriticalSection(&world_instance.lock);
+
 			const char *status_desc = get_http_status_description(status);
 			char response_start[128];
 			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
