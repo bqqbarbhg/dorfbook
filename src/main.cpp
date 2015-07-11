@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 
 	char name_buf[512], *name_ptr = name_buf;
 
-	World world = { 0 };
+	static World world = { 0 };
 
 	for (U32 id = 1; id < 10; id++) {
 		char *name = name_ptr;
@@ -195,6 +195,26 @@ int main(int argc, char **argv)
 			send(client_socket, separator, (int)strlen(separator), 0);
 			send(client_socket, body, (int)strlen(body), 0);
 
+		} else if (!strcmp(path, "/feed")) {
+			char body[1024];
+
+			EnterCriticalSection(&world_instance.lock);
+			update_to_now(&world_instance);
+			int status = render_feed(world_instance.world, body);
+			LeaveCriticalSection(&world_instance.lock);
+
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
 		
 		} else if (sscanf(path, "/entities/%d", &id) == 1) {
 			char body[1024];

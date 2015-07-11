@@ -31,10 +31,32 @@ struct Dwarf
 	Activity activity;
 };
 
+struct Post
+{
+	U32 by_id;
+	Activity activity;
+};
+
 struct World
 {
 	Dwarf dwarves[64];
+	Post posts[128];
+	U32 post_index;
 };
+
+void world_post(World *world, U32 id, Activity activity)
+{
+	world->post_index = (world->post_index + 1) % Count(world->posts);
+	Post *post = &world->posts[world->post_index];
+	post->by_id = id;
+	post->activity = activity;
+}
+
+void dwarf_do_activity(World *world, Dwarf *dwarf, Activity activity)
+{
+	dwarf->activity = activity;
+	world_post(world, dwarf->id, activity);
+}
 
 void world_tick(World *world)
 {
@@ -47,23 +69,23 @@ void world_tick(World *world)
 
 		case Activity_Idle:
 			if (dwarf->sleep > 50) {
-				dwarf->activity = Activity_Sleep;
+				dwarf_do_activity(world, dwarf, Activity_Sleep);
 			} else if (dwarf->hunger > 50) {
-				dwarf->activity = Activity_Eat;
+				dwarf_do_activity(world, dwarf, Activity_Eat);
 			}
 			break;
 
 		case Activity_Eat:
 			dwarf->hunger -= 3;
 			if (dwarf->hunger < 5) {
-				dwarf->activity = Activity_Idle;
+				dwarf_do_activity(world, dwarf, Activity_Idle);
 			}
 			break;
 
 		case Activity_Sleep:
 			dwarf->sleep -= 3;
 			if (dwarf->sleep < 5) {
-				dwarf->activity = Activity_Idle;
+				dwarf_do_activity(world, dwarf, Activity_Idle);
 			}
 			break;
 
@@ -81,8 +103,34 @@ int render_dwarves(World *world, char *buffer)
 		if (dwarf->id == 0)
 			continue;
 
-		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a></li>\n",
-				dwarf->id, dwarf->name);
+		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a> (%s)</li>\n",
+				dwarf->id, dwarf->name, activity_infos[dwarf->activity].description);
+	}
+	ptr += sprintf(ptr, "</ul></body></html>\n");
+
+	return 200;
+}
+
+int render_feed(World *world, char *buffer)
+{
+	char *ptr = buffer;
+	ptr += sprintf(ptr, "<html><head><title>Activity feed</title></head>");
+	ptr += sprintf(ptr, "<body><ul>\n");
+	for (U32 i = 0; i < Count(world->posts); i++) {
+		Post *post = &world->posts[i];
+		if (post->by_id == 0)
+			continue;
+
+		Dwarf *dwarf = 0;
+		for (U32 j = 0; j < Count(world->dwarves); j++) {
+			if (world->dwarves[j].id == post->by_id)
+				dwarf = &world->dwarves[j];
+		}
+		if (!dwarf)
+			continue;
+
+		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a>:", dwarf->id, dwarf->name);
+		ptr += sprintf(ptr, "I will go %s</li>\n", activity_infos[post->activity].description);
 	}
 	ptr += sprintf(ptr, "</ul></body></html>\n");
 
