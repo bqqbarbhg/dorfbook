@@ -44,12 +44,23 @@ struct WorldInstance
 
 void update_to_now(WorldInstance *world_instance)
 {
+	LARGE_INTEGER begin, end, freq;
+	QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&begin);
+
+	int count = 0;
 	time_t now = time(NULL);
 	while (world_instance->last_updated < now) {
-		printf("Updating world to tick %u\n", world_instance->last_updated);
+		count++;
 		world_tick(world_instance->world);
 		world_instance->last_updated++;
 	}
+	QueryPerformanceCounter(&end);
+	I64 diff = end.QuadPart - begin.QuadPart;
+	I64 ticks = diff * 100000LL / freq.QuadPart;
+	float ms = (float)ticks / 100.0f;
+
+	printf("Updated world %d ticks: Took %.2fms\n", count, ms);
 }
 
 DWORD WINAPI UpdateThread(void *world_instance_ptr)
