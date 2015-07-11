@@ -3,6 +3,7 @@
 #include <ws2tcpip.h>
 #include <Windows.h>
 #include <signal.h>
+#include <stdlib.h>
 
 SOCKET server_socket;
 
@@ -77,11 +78,26 @@ int main(int argc, char **argv)
 
 	freeaddrinfo(addr);
 
+	const char *names[] = {
+		"Urist", "Gimli", "Thir", "Tharun", "Dofor", "Ufir",
+		"Bohir",
+	};
+
+	char name_buf[512], *name_ptr = name_buf;
+
 	World world = { 0 };
-	world.dwarves[0].id = 1;
-	world.dwarves[0].name = "Urist";
-	world.dwarves[0].hunger = 20;
-	world.dwarves[0].sleep = 30;
+
+	for (U32 id = 1; id < 10; id++) {
+		char *name = name_ptr;
+		name_ptr += 1 + sprintf(name_ptr, "%s %sson",
+			names[rand() % Count(names)], names[rand() % Count(names)]);
+
+		Dwarf *dwarf = &world.dwarves[id];
+		dwarf->id = id;
+		dwarf->name = name;
+		dwarf->hunger = 20;
+		dwarf->sleep = 30;
+	}
 
 	WorldInstance world_instance = { 0 };
 	world_instance.world = &world;
