@@ -18,6 +18,15 @@ struct World
 	Dwarf dwarves[64];
 };
 
+void world_tick(World *world)
+{
+	for (U32 i = 0; i < Count(world->dwarves); i++) {
+		Dwarf *dwarf = &world->dwarves[i];
+		dwarf->hunger++;
+		dwarf->sleep++;
+	}
+}
+
 int render_entity(World *world, U32 id, char *buffer)
 {
 	char *ptr = buffer;

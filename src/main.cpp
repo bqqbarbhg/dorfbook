@@ -66,6 +66,8 @@ int main(int argc, char **argv)
 	world.dwarves[0].sleep = 30;
 
 	for (;;) {
+		world_tick(&world);
+
 		SOCKET client_socket = accept(server_socket, NULL, NULL);
 		if (client_socket == INVALID_SOCKET)
 			continue;
