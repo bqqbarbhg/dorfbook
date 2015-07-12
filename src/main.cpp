@@ -120,6 +120,7 @@ int main(int argc, char **argv)
 		dwarf->name = name;
 		dwarf->hunger = rand() % 50;
 		dwarf->sleep = rand() % 50;
+		dwarf->alive = true;
 	}
 
 	WorldInstance world_instance = { 0 };

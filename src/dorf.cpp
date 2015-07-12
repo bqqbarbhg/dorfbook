@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef int32_t I32;
 typedef uint32_t U32;
 typedef int64_t I64;
+typedef uint64_t U64;
 #define Count(array) (sizeof(array)/sizeof(*(array)))
 
 enum Activity
@@ -29,12 +31,20 @@ struct Dwarf
 	I32 hunger;
 	I32 sleep;
 	Activity activity;
+	bool alive;
+};
+
+enum Post_Type
+{
+	Post_Death,
+	Post_Activity,
 };
 
 struct Post
 {
 	U32 by_id;
-	Activity activity;
+	Post_Type type;
+	U64 data;
 };
 
 struct World
@@ -44,30 +54,40 @@ struct World
 	U32 post_index;
 };
 
-void world_post(World *world, U32 id, Activity activity)
+void world_post(World *world, U32 id, Post_Type type, U64 data)
 {
 	world->post_index = (world->post_index + 1) % Count(world->posts);
 	Post *post = &world->posts[world->post_index];
 	post->by_id = id;
-	post->activity = activity;
+	post->type = type;
+	post->data = data;
 }
 
 void dwarf_do_activity(World *world, Dwarf *dwarf, Activity activity)
 {
 	dwarf->activity = activity;
-	world_post(world, dwarf->id, activity);
+	if (rand() % 100 < 5) {
+		world_post(world, dwarf->id, Post_Activity, activity);
+	}
+}
+
+const char *dwarf_status(Dwarf *dwarf)
+{
+	if (!dwarf->alive)
+		return "Dead";
+	return activity_infos[dwarf->activity].description;
 }
 
 void world_tick(World *world)
 {
 	for (U32 i = 0; i < Count(world->dwarves); i++) {
 		Dwarf *dwarf = &world->dwarves[i];
-		if (!dwarf->id)
+		if (!dwarf->id || !dwarf->alive)
 			continue;
 
 		dwarf->hunger++;
 		dwarf->sleep++;
-
+		
 		switch (dwarf->activity) {
 
 		case Activity_Idle:
@@ -93,6 +113,11 @@ void world_tick(World *world)
 			break;
 
 		}
+
+		if (rand() % 1000 < 2) {
+			world_post(world, dwarf->id, Post_Death, 0);
+			dwarf->alive = false;
+		}
 	}
 }
 
@@ -107,7 +132,7 @@ int render_dwarves(World *world, char *buffer)
 			continue;
 
 		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a> (%s)</li>\n",
-				dwarf->id, dwarf->name, activity_infos[dwarf->activity].description);
+				dwarf->id, dwarf->name, dwarf_status(dwarf));
 	}
 	ptr += sprintf(ptr, "</ul></body></html>\n");
 
@@ -133,7 +158,19 @@ int render_feed(World *world, char *buffer)
 			continue;
 
 		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a>:", dwarf->id, dwarf->name);
-		ptr += sprintf(ptr, "I will go %s</li>\n", activity_infos[post->activity].description);
+		
+		switch (post->type) {
+
+		case Post_Activity:
+			ptr += sprintf(ptr, "I will go %s", activity_infos[post->data].description);
+			break;
+
+		case Post_Death:
+			ptr += sprintf(ptr, "Died suddenly");
+			break;
+
+		}
+		ptr += sprintf(ptr, "</li>\n");
 	}
 	ptr += sprintf(ptr, "</ul></body></html>\n");
 
@@ -158,7 +195,7 @@ int render_entity(World *world, U32 id, char *buffer)
 
 	ptr += sprintf(ptr, "<html><head><title>%s</title></head>", dwarf->name);
 	ptr += sprintf(ptr, "<body><h1>%s</h1>", dwarf->name); 
-	ptr += sprintf(ptr, "<h2>%s</h2>", activity_infos[dwarf->activity].description); 
+	ptr += sprintf(ptr, "<h2>%s</h2>", dwarf_status(dwarf)); 
 	ptr += sprintf(ptr, "<h3>Hunger: %d, sleep: %d</h3>", dwarf->hunger, dwarf->sleep); 
 	ptr += sprintf(ptr, "</body></html>"); 
 
