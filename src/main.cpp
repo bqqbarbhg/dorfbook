@@ -146,6 +146,8 @@ int main(int argc, char **argv)
 
 		U32 id;
 
+		static char body[1024*1024];
+
 		if (!strcmp(path, "/favicon.ico")) {
 			puts("Serving favicon");
 
@@ -175,7 +177,6 @@ int main(int argc, char **argv)
 			fclose(icon);
 
 		} else if (!strcmp(path, "/dwarves")) {
-			char body[1024];
 
 			EnterCriticalSection(&world_instance.lock);
 			update_to_now(&world_instance);
@@ -196,7 +197,6 @@ int main(int argc, char **argv)
 			send(client_socket, body, (int)strlen(body), 0);
 
 		} else if (!strcmp(path, "/feed")) {
-			char body[1024];
 
 			EnterCriticalSection(&world_instance.lock);
 			update_to_now(&world_instance);
@@ -217,7 +217,6 @@ int main(int argc, char **argv)
 			send(client_socket, body, (int)strlen(body), 0);
 		
 		} else if (sscanf(path, "/entities/%d", &id) == 1) {
-			char body[1024];
 
 			EnterCriticalSection(&world_instance.lock);
 			update_to_now(&world_instance);
