@@ -66,7 +66,7 @@ void world_post(World *world, U32 id, Post_Type type, U64 data)
 void dwarf_do_activity(World *world, Dwarf *dwarf, Activity activity)
 {
 	dwarf->activity = activity;
-	if (rand() % 100 < 5) {
+	if (activity != Activity_Idle && rand() % 100 < 5) {
 		world_post(world, dwarf->id, Post_Activity, activity);
 	}
 }
