@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define DORF_PORT "3500"
+
 SOCKET server_socket;
 
 struct HTTP_Status_Description {
@@ -89,7 +91,7 @@ int main(int argc, char **argv)
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;
 
-	getaddrinfo(NULL, "3500", &hints, &addr);
+	getaddrinfo(NULL, DORF_PORT, &hints, &addr);
 
 	server_socket = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 	if (bind(server_socket, addr->ai_addr, (int)addr->ai_addrlen) == SOCKET_ERROR) {
@@ -105,6 +107,8 @@ int main(int argc, char **argv)
 		"Urist", "Gimli", "Thir", "Tharun", "Dofor", "Ufir",
 		"Bohir",
 	};
+
+	puts("Dorfbook serving at port " DORF_PORT);
 
 	char name_buf[512], *name_ptr = name_buf;
 
