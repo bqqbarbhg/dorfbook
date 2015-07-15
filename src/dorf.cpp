@@ -18,6 +18,7 @@ struct Activity_Info
 struct Dwarf
 {
 	U32 id;
+	U32 location;
 	const char *name;
 	I32 hunger;
 	I32 sleep;
@@ -199,7 +200,9 @@ int render_entity(World *world, U32 id, char *buffer)
 
 	ptr += sprintf(ptr, "<html><head><title>%s</title></head>", dwarf->name);
 	ptr += sprintf(ptr, "<body><h1>%s</h1>", dwarf->name); 
-	ptr += sprintf(ptr, "<h2>%s</h2>", dwarf_status(dwarf)); 
+	Location* location = &world->locations[dwarf->location];
+	ptr += sprintf(ptr, "<h2>%s in <a href=\"/locations/%d\">%s</a></h2>",
+		dwarf_status(dwarf), location->id, location->name); 
 	ptr += sprintf(ptr, "<h3>Hunger: %d, sleep: %d</h3>", dwarf->hunger, dwarf->sleep); 
 	ptr += sprintf(ptr, "</body></html>"); 
 

@@ -129,6 +129,7 @@ int main(int argc, char **argv)
 
 		Dwarf *dwarf = &world.dwarves[id];
 		dwarf->id = id;
+		dwarf->location = 1;
 		dwarf->name = name;
 		dwarf->hunger = rand() % 50;
 		dwarf->sleep = rand() % 50;
