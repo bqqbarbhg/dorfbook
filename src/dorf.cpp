@@ -25,6 +25,12 @@ struct Dwarf
 	bool alive;
 };
 
+struct Location
+{
+	U32 id;
+	const char *name;
+};
+
 enum Post_Type
 {
 	Post_Death,
@@ -41,6 +47,7 @@ struct Post
 struct World
 {
 	Dwarf dwarves[64];
+	Location locations[64];
 	Post posts[128];
 	U32 post_index;
 
@@ -195,6 +202,47 @@ int render_entity(World *world, U32 id, char *buffer)
 	ptr += sprintf(ptr, "<h2>%s</h2>", dwarf_status(dwarf)); 
 	ptr += sprintf(ptr, "<h3>Hunger: %d, sleep: %d</h3>", dwarf->hunger, dwarf->sleep); 
 	ptr += sprintf(ptr, "</body></html>"); 
+
+	return 200;
+}
+
+int render_locations(World *world, char *buffer)
+{
+	char *ptr = buffer;
+	ptr += sprintf(ptr, "<html><head><title>Locations</title></head>");
+	ptr += sprintf(ptr, "<body><ul>\n");
+	for (U32 i = 0; i < Count(world->locations); i++) {
+		Location *location = &world->locations[i];
+		if (location->id == 0)
+			continue;
+
+		ptr += sprintf(ptr, "<li><a href=\"/locations/%d\">%s</a></li>\n",
+				location->id, location->name);
+	}
+	ptr += sprintf(ptr, "</ul></body></html>\n");
+
+	return 200;
+}
+
+int render_location(World *world, U32 id, char *buffer)
+{
+	char *ptr = buffer;
+	Location *location = 0;
+	for (U32 i = 0; i < Count(world->locations); i++) {
+		if (world->locations[i].id == id) {
+			location = &world->locations[i];
+			break;
+		}
+	}
+
+	if (!location) {
+		sprintf(buffer, "Location not found with ID #%u", id);
+		return 404;
+	}
+
+	ptr += sprintf(ptr, "<html><head><title>%s</title></head><body>", location->name);
+	ptr += sprintf(ptr, "<h1>%s</h1>", location->name);
+	ptr += sprintf(ptr, "</body></html>\n");
 
 	return 200;
 }

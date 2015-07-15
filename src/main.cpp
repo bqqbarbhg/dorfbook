@@ -115,6 +115,13 @@ int main(int argc, char **argv)
 	static World world = { 0 };
 	world.random_series = series_from_seed32(0xD02F);
 
+	world.locations[1].id = 1;
+	world.locations[1].name = "Initial Cave";
+	world.locations[2].id = 2;
+	world.locations[2].name = "The Great Outdoors";
+	world.locations[3].id = 3;
+	world.locations[3].name = "Some Pub";
+
 	for (U32 id = 1; id < 10; id++) {
 		char *name = name_ptr;
 		name_ptr += 1 + sprintf(name_ptr, "%s %sson",
@@ -227,6 +234,46 @@ int main(int argc, char **argv)
 			EnterCriticalSection(&world_instance.lock);
 			update_to_now(&world_instance);
 			int status = render_entity(world_instance.world, id, body);
+			LeaveCriticalSection(&world_instance.lock);
+
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+
+		} else if (!strcmp(path, "/locations")) {
+
+			EnterCriticalSection(&world_instance.lock);
+			update_to_now(&world_instance);
+			int status = render_locations(world_instance.world, body);
+			LeaveCriticalSection(&world_instance.lock);
+
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+
+		} else if (sscanf(path, "/locations/%d", &id) == 1) {
+
+			EnterCriticalSection(&world_instance.lock);
+			update_to_now(&world_instance);
+			int status = render_location(world_instance.world, id, body);
 			LeaveCriticalSection(&world_instance.lock);
 
 			const char *status_desc = get_http_status_description(status);
