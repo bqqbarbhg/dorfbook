@@ -113,6 +113,7 @@ int main(int argc, char **argv)
 	char name_buf[512], *name_ptr = name_buf;
 
 	static World world = { 0 };
+	world.random_series = series_from_seed32(0xD02F);
 
 	for (U32 id = 1; id < 10; id++) {
 		char *name = name_ptr;

@@ -1,12 +1,5 @@
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
-
-typedef int32_t I32;
-typedef uint32_t U32;
-typedef int64_t I64;
-typedef uint64_t U64;
-#define Count(array) (sizeof(array)/sizeof(*(array)))
 
 enum Activity
 {
@@ -52,6 +45,8 @@ struct World
 	Dwarf dwarves[64];
 	Post posts[128];
 	U32 post_index;
+
+	Random_Series random_series;
 };
 
 void world_post(World *world, U32 id, Post_Type type, U64 data)
@@ -65,8 +60,10 @@ void world_post(World *world, U32 id, Post_Type type, U64 data)
 
 void dwarf_do_activity(World *world, Dwarf *dwarf, Activity activity)
 {
+	Random_Series *rs = &world->random_series;
+
 	dwarf->activity = activity;
-	if (activity != Activity_Idle && rand() % 100 < 5) {
+	if (activity != Activity_Idle && next_one_in(rs, 100)) {
 		world_post(world, dwarf->id, Post_Activity, activity);
 	}
 }
@@ -80,6 +77,8 @@ const char *dwarf_status(Dwarf *dwarf)
 
 void world_tick(World *world)
 {
+	Random_Series *rs = &world->random_series;
+
 	for (U32 i = 0; i < Count(world->dwarves); i++) {
 		Dwarf *dwarf = &world->dwarves[i];
 		if (!dwarf->id || !dwarf->alive)
@@ -114,7 +113,7 @@ void world_tick(World *world)
 
 		}
 
-		if (rand() % 1000 < 2) {
+		if (next_one_in(rs, 100000)) {
 			world_post(world, dwarf->id, Post_Death, 0);
 			dwarf->alive = false;
 		}
