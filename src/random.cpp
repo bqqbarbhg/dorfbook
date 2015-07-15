@@ -18,6 +18,8 @@ Random_Series series_from_seed32(U32 seed)
 // Returns an uniform distribution in [0, 2^32)
 U32 next32(Random_Series *series)
 {
+	// XorShift algorithm
+	// Note: This may not be the best option, consider PCG
 	Random_Series s = *series;
 	U32 t = s.x ^ (s.x << 11);
 	s.x = s.y; s.y = s.z; s.z = s.w;
