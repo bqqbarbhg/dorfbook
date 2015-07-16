@@ -121,6 +121,10 @@ int main(int argc, char **argv)
 	world.locations[2].name = "The Great Outdoors";
 	world.locations[3].id = 3;
 	world.locations[3].name = "Some Pub";
+	world.locations[3].has_food = true;
+	world.locations[4].id = 4;
+	world.locations[4].name = "Bedroom";
+	world.locations[4].has_bed = true;
 
 	for (U32 id = 1; id < 10; id++) {
 		char *name = name_ptr;

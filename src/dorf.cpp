@@ -30,6 +30,8 @@ struct Location
 {
 	U32 id;
 	const char *name;
+	bool has_food;
+	bool has_bed;
 };
 
 enum Post_Type
@@ -87,6 +89,7 @@ void world_tick(World *world)
 
 	for (U32 i = 0; i < Count(world->dwarves); i++) {
 		Dwarf *dwarf = &world->dwarves[i];
+		Location *location = &world->locations[dwarf->location];
 		if (!dwarf->id || !dwarf->alive)
 			continue;
 
@@ -104,14 +107,34 @@ void world_tick(World *world)
 			break;
 
 		case Activity_Eat:
-			dwarf->hunger -= 3;
+			if (location->has_food) {
+				dwarf->hunger -= 3;
+			} else {
+				for (U32 i = 0; i < Count(world->locations); i++) {
+					Location *new_location = &world->locations[i];
+					if (new_location->id && new_location->has_food) {
+						dwarf->location = new_location->id;
+						break;
+					}
+				}
+			}
 			if (dwarf->hunger < 5) {
 				dwarf_do_activity(world, dwarf, Activity_Idle);
 			}
 			break;
 
 		case Activity_Sleep:
-			dwarf->sleep -= 3;
+			if (location->has_bed) {
+				dwarf->sleep -= 3;
+			} else {
+				for (U32 i = 0; i < Count(world->locations); i++) {
+					Location *new_location = &world->locations[i];
+					if (new_location->id && new_location->has_bed) {
+						dwarf->location = new_location->id;
+						break;
+					}
+				}
+			}
 			if (dwarf->sleep < 5) {
 				dwarf_do_activity(world, dwarf, Activity_Idle);
 			}
