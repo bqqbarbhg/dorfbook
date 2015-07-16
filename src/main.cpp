@@ -9,6 +9,7 @@
 #define DORF_PORT "3500"
 
 SOCKET server_socket;
+LARGE_INTEGER performance_frequency;
 
 struct HTTP_Status_Description {
 	int status_code;
@@ -46,8 +47,7 @@ struct WorldInstance
 
 void update_to_now(WorldInstance *world_instance)
 {
-	LARGE_INTEGER begin, end, freq;
-	QueryPerformanceFrequency(&freq);
+	LARGE_INTEGER begin, end;
 	QueryPerformanceCounter(&begin);
 
 	int count = 0;
@@ -59,7 +59,7 @@ void update_to_now(WorldInstance *world_instance)
 	}
 	QueryPerformanceCounter(&end);
 	I64 diff = end.QuadPart - begin.QuadPart;
-	I64 ticks = diff * 100000LL / freq.QuadPart;
+	I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
 	float ms = (float)ticks / 100.0f;
 
 	printf("Updated world %d ticks: Took %.2fms\n", count, ms);
@@ -81,6 +81,8 @@ int main(int argc, char **argv)
 {
 	WSADATA wsadata;
 	WSAStartup(0x0202, &wsadata);
+
+	QueryPerformanceFrequency(&performance_frequency);
 
 	signal(SIGINT, handle_kill);
 
@@ -154,6 +156,9 @@ int main(int argc, char **argv)
 
 		char buffer[512];
 		int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
+
+		LARGE_INTEGER begin, end;
+		QueryPerformanceCounter(&begin);
 
 		char method[64];
 		char path[128];
@@ -309,6 +314,12 @@ int main(int argc, char **argv)
 		}
 
 		closesocket(client_socket);
+
+		QueryPerformanceCounter(&end);
+		I64 diff = end.QuadPart - begin.QuadPart;
+		I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
+		float ms = (float)ticks / 100.0f;
+		printf("> Took %.2f ms\n", ms);
 	}
 }
 
