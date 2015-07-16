@@ -24,6 +24,7 @@ struct Dwarf
 	I32 sleep;
 	Activity activity;
 	bool alive;
+	U32 seed;
 };
 
 struct Location
@@ -261,7 +262,8 @@ int render_entity_avatar(World *world, U32 id, char *buffer)
 
 	ptr += sprintf(ptr, "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\""
 		" width=\"100\" height=\"100\">\n");
-	ptr += sprintf(ptr, "<circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"red\" />\n"); 
+	ptr += sprintf(ptr, "<circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"#%06x\" />\n",
+			dwarf->seed & 0xFFFFFF); 
 	ptr += sprintf(ptr, "</svg>\n"); 
 
 	return 200;

@@ -140,6 +140,7 @@ int main(int argc, char **argv)
 		dwarf->hunger = rand() % 50;
 		dwarf->sleep = rand() % 50;
 		dwarf->alive = true;
+		dwarf->seed = next32(&world.random_series);
 	}
 
 	WorldInstance world_instance = { 0 };
