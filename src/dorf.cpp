@@ -235,6 +235,8 @@ int render_entity(World *world, U32 id, char *buffer)
 
 	ptr += sprintf(ptr, "<html><head><title>%s</title></head>", dwarf->name);
 	ptr += sprintf(ptr, "<body><h1>%s</h1>", dwarf->name); 
+	ptr += sprintf(ptr, "<img src=\"/entities/%d/avatar.svg\""
+		"width=\"200\" height=\"200\">", dwarf->id); 
 	Location* location = &world->locations[dwarf->location];
 	ptr += sprintf(ptr, "<h2>%s in <a href=\"/locations/%d\">%s</a></h2>",
 		dwarf_status(dwarf), location->id, location->name); 
