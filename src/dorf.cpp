@@ -89,9 +89,10 @@ void world_tick(World *world)
 
 	for (U32 i = 0; i < Count(world->dwarves); i++) {
 		Dwarf *dwarf = &world->dwarves[i];
-		Location *location = &world->locations[dwarf->location];
 		if (!dwarf->id || !dwarf->alive)
 			continue;
+
+		Location *location = &world->locations[dwarf->location];
 
 		dwarf->hunger++;
 		dwarf->sleep++;
