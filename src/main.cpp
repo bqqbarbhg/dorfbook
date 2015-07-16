@@ -165,7 +165,7 @@ int main(int argc, char **argv)
 		char http_version[32];
 		sscanf(buffer, "%s %s %s\r\n", method, path, http_version);
 
-		printf("Request to path %s\n", path);
+		printf("Request to path %s %s\n", method, path);
 
 		U32 id;
 
