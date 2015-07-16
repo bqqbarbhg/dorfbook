@@ -154,16 +154,22 @@ int render_dwarves(World *world, char *buffer)
 {
 	char *ptr = buffer;
 	ptr += sprintf(ptr, "<html><head><title>Dwarves</title></head>");
-	ptr += sprintf(ptr, "<body><ul>\n");
+	ptr += sprintf(ptr, "<body><table><tr><th>Name</th><th>Location</th>");
+	ptr += sprintf(ptr, "<th>Activity</th></tr>");
 	for (U32 i = 0; i < Count(world->dwarves); i++) {
 		Dwarf *dwarf = &world->dwarves[i];
 		if (dwarf->id == 0)
 			continue;
+		Location *location = &world->locations[dwarf->location];
 
-		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a> (%s)</li>\n",
-				dwarf->id, dwarf->name, dwarf_status(dwarf));
+		ptr += sprintf(ptr, "<tr><td><a href=\"/entities/%d\">%s</a></td>",
+			dwarf->id, dwarf->name);
+		ptr += sprintf(ptr, "<td><a href=\"/locations/%d\">%s</a></td>",
+			location->id, location->name);
+		ptr += sprintf(ptr, "<td>%s</td></tr>\n",
+			dwarf_status(dwarf));
 	}
-	ptr += sprintf(ptr, "</ul></body></html>\n");
+	ptr += sprintf(ptr, "</table></body></html>\n");
 
 	return 200;
 }
