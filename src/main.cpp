@@ -239,6 +239,30 @@ int main(int argc, char **argv)
 			send(client_socket, separator, (int)strlen(separator), 0);
 			send(client_socket, body, (int)strlen(body), 0);
 		
+			// TODO: Seriously need a real routing scheme
+		} else if (sscanf(path, "/entities/%d", &id) == 1 && strstr(path, "avatar.svg")) {
+
+			EnterCriticalSection(&world_instance.lock);
+			update_to_now(&world_instance);
+			int status = render_entity_avatar(world_instance.world, id, body);
+			LeaveCriticalSection(&world_instance.lock);
+
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			const char *content_type = "Content-Type: image/svg+xml\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, content_type, (int)strlen(content_type), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+
 		} else if (sscanf(path, "/entities/%d", &id) == 1) {
 
 			EnterCriticalSection(&world_instance.lock);

@@ -156,15 +156,17 @@ int render_dwarves(World *world, char *buffer)
 {
 	char *ptr = buffer;
 	ptr += sprintf(ptr, "<html><head><title>Dwarves</title></head>");
-	ptr += sprintf(ptr, "<body><table><tr><th>Name</th><th>Location</th>");
-	ptr += sprintf(ptr, "<th>Activity</th></tr>");
+	ptr += sprintf(ptr, "<body><table><tr><th>Avatar</th><th>Name</th>");
+	ptr += sprintf(ptr, "<th>Location</th><th>Activity</th></tr>");
 	for (U32 i = 0; i < Count(world->dwarves); i++) {
 		Dwarf *dwarf = &world->dwarves[i];
 		if (dwarf->id == 0)
 			continue;
 		Location *location = &world->locations[dwarf->location];
 
-		ptr += sprintf(ptr, "<tr><td><a href=\"/entities/%d\">%s</a></td>",
+		ptr += sprintf(ptr, "<tr><td><img src=\"/entities/%d/avatar.svg\" "
+			"width=\"50\" height=\"50\"></td>", dwarf->id);
+		ptr += sprintf(ptr, "<td><a href=\"/entities/%d\">%s</a></td>",
 			dwarf->id, dwarf->name);
 		ptr += sprintf(ptr, "<td><a href=\"/locations/%d\">%s</a></td>",
 			location->id, location->name);
@@ -237,6 +239,30 @@ int render_entity(World *world, U32 id, char *buffer)
 		dwarf_status(dwarf), location->id, location->name); 
 	ptr += sprintf(ptr, "<h3>Hunger: %d, sleep: %d</h3>", dwarf->hunger, dwarf->sleep); 
 	ptr += sprintf(ptr, "</body></html>"); 
+
+	return 200;
+}
+
+int render_entity_avatar(World *world, U32 id, char *buffer)
+{
+	char *ptr = buffer;
+	Dwarf *dwarf = 0;
+	for (U32 i = 0; i < Count(world->dwarves); i++) {
+		if (world->dwarves[i].id == id) {
+			dwarf = &world->dwarves[i];
+			break;
+		}
+	}
+
+	if (!dwarf) {
+		sprintf(buffer, "Entity not found with ID #%u", id);
+		return 404;
+	}
+
+	ptr += sprintf(ptr, "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\""
+		" width=\"100\" height=\"100\">\n");
+	ptr += sprintf(ptr, "<circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"red\" />\n"); 
+	ptr += sprintf(ptr, "</svg>\n"); 
 
 	return 200;
 }
