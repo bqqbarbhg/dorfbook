@@ -143,7 +143,9 @@ void world_tick(World *world)
 
 		}
 
-		if (next_one_in(rs, 100000)) {
+		// TODO: Support more precision, now the chance is
+		// 1:1000 and 1:1000 = 1:1000*1000 = 1:1000000
+		if (next_one_in(rs, 1000) && next_one_in(rs, 1000)) {
 			world_post(world, dwarf->id, Post_Death, 0);
 			dwarf->alive = false;
 		}
