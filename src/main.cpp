@@ -111,6 +111,7 @@ int main(int argc, char **argv)
 	};
 
 	puts("Dorfbook serving at port " DORF_PORT);
+	puts("Enter ^C to stop");
 
 	char name_buf[512], *name_ptr = name_buf;
 
