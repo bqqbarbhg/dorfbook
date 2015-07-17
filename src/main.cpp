@@ -84,6 +84,110 @@ struct Response_Thread_Data
 	char *body_storage;
 };
 
+struct Socket_Buffer
+{
+	SOCKET socket;
+	char *data;
+	int data_size;
+	int pos;
+	int size;
+};
+
+struct Read_Block
+{
+	char *data;
+	int length;
+};
+
+Socket_Buffer buffer_new(SOCKET socket, int size=16)
+{
+	Socket_Buffer buffer = { 0 };
+	buffer.socket = socket;
+	buffer.data = (char*)malloc(size);
+	buffer.data_size = size;
+	return buffer;
+}
+
+// NOTE: Does not free the socket
+void buffer_free(Socket_Buffer *buffer)
+{
+	free(buffer->data);
+}
+
+void buffer_fill_read(Socket_Buffer *buffer)
+{
+	int bytes_read = recv(buffer->socket, buffer->data, buffer->data_size, 0);
+	buffer->size = bytes_read;
+	buffer->pos = 0;
+}
+
+bool buffer_peek(Socket_Buffer *buffer, Read_Block *block, int length)
+{
+	if (length == 0)
+		return false;
+
+	int buffer_left = buffer->size - buffer->pos;
+	if (buffer_left == 0) {
+		buffer_fill_read(buffer);
+		buffer_left = buffer->size - buffer->pos;
+	}
+
+	block->data = buffer->data + buffer->pos;
+	block->length = min(length, buffer_left);
+	return true;
+}
+
+bool buffer_read(Socket_Buffer *buffer, Read_Block *block, int length)
+{
+	if (!buffer_peek(buffer, block, length))
+		return false;
+	buffer->pos += block->length;
+	return true;
+}
+
+bool buffer_accept(Socket_Buffer *buffer, char *value, int length)
+{
+	int pos = 0;
+	Read_Block block;
+	while (buffer_read(buffer, &block, length - pos)) {
+		if (memcmp(block.data, value + pos, block.length))
+			return false;
+		pos += block.length;
+	}
+	return true;
+}
+
+int buffer_read_line(Socket_Buffer *buffer, char *line, int length)
+{
+	int pos = 0;
+	Read_Block block;
+	while (buffer_peek(buffer, &block, length - pos)) {
+		char *end = (char*)memchr(block.data, '\r', block.length);
+		if (end) {
+			int in_length = (int)(end - block.data);
+			if (in_length > length - pos - 1) return -1;
+
+			memcpy(line + pos, block.data, in_length);
+			pos += in_length;
+
+			buffer->pos += in_length;
+			if (!buffer_accept(buffer, "\r\n", 2)) return -2;
+			line[pos] = '\0';
+
+			return pos;
+		} else {
+			if (block.length > length - pos - 1) return -1;
+			
+			memcpy(line + pos, block.data, block.length);
+			buffer->pos += block.length;
+			pos += block.length;
+		}
+	}
+
+	// Reached the end of the line buffer without finding a \r
+	return -1;
+}
+
 DWORD WINAPI thread_do_response(void *thread_data)
 {
 	Response_Thread_Data *data = (Response_Thread_Data*)thread_data;
@@ -91,18 +195,25 @@ DWORD WINAPI thread_do_response(void *thread_data)
 	World_Instance *world_instance = data->world_instance;
 	char *body = data->body_storage;
 
-	char buffer[512];
-	int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
+	Socket_Buffer buffer = buffer_new(client_socket);
+	char line[256];
 
-	LARGE_INTEGER begin, end;
-	QueryPerformanceCounter(&begin);
+	buffer_read_line(&buffer, line, sizeof(line));
 
 	char method[64];
 	char path[128];
 	char http_version[32];
-	sscanf(buffer, "%s %s %s\r\n", method, path, http_version);
+	sscanf(line, "%s %s %s\r\n", method, path, http_version);
 
 	printf("Request to path %s %s\n", method, path);
+
+	while (strlen(line)) {
+		buffer_read_line(&buffer, line, sizeof(line));
+		printf("%s\n", line);
+	}
+
+	LARGE_INTEGER begin, end;
+	QueryPerformanceCounter(&begin);
 
 	U32 id;
 
@@ -272,6 +383,7 @@ DWORD WINAPI thread_do_response(void *thread_data)
 		send(client_socket, body, (int)strlen(body), 0);
 	}
 
+	buffer_free(&buffer);
 	closesocket(client_socket);
 
 	QueryPerformanceCounter(&end);
