@@ -11,6 +11,18 @@
 SOCKET server_socket;
 LARGE_INTEGER performance_frequency;
 
+volatile long active_thread_count;
+
+struct Server_Stats
+{
+	U32 snapshot_count;
+	U32 snapshot_index;
+	long *active_thread_counts;
+	CRITICAL_SECTION lock;
+};
+
+Server_Stats global_stats;
+
 struct HTTP_Status_Description {
 	int status_code;
 	const char *description;
@@ -76,6 +88,46 @@ DWORD WINAPI thread_background_world_update(void *world_instance_ptr)
 		LeaveCriticalSection(&world_instance->lock);
 		Sleep(10000);
 	}
+}
+
+DWORD WINAPI thread_background_stat_update(void *server_stats)
+{
+	Server_Stats *stats = (Server_Stats*)server_stats;
+	for (;;) {
+
+		EnterCriticalSection(&stats->lock);
+		stats->active_thread_counts[stats->snapshot_index] = active_thread_count;
+
+		stats->snapshot_index = (stats->snapshot_index + 1) % stats->snapshot_count;
+		LeaveCriticalSection(&stats->lock);
+
+		Sleep(1000);
+	}
+}
+
+int render_stats(Server_Stats *stats, char *body)
+{
+	char *ptr = body;
+
+	ptr += sprintf(ptr, "<html><head><title>Server stats</title></head><body>");
+	ptr += sprintf(ptr, "<h5>Active thread count</h5>");
+	ptr += sprintf(ptr, "<svg width=\"400\" height=\"200\">\n");
+	ptr += sprintf(ptr, "<path d=\"");
+	char command_char = 'M';
+	for (U32 i = 0; i < stats->snapshot_count; i++) {
+		int snapshot_index = (stats->snapshot_index - 1 - i + stats->snapshot_count)
+			% stats->snapshot_count;
+
+		float x = ((float)i / stats->snapshot_count) * 400.0f;
+		float y = 200.0f - ((float)stats->active_thread_counts[snapshot_index] * 5);
+
+		ptr += sprintf(ptr, "%c%f %f ", command_char, x, y);
+		command_char = 'L';
+	}
+	ptr += sprintf(ptr, "\" stroke=\"black\" stroke-width=\"2\" fill=\"none\" />\n");
+	ptr += sprintf(ptr, "</svg>");
+
+	return 200;
 }
 
 struct Response_Thread_Data
@@ -199,6 +251,8 @@ DWORD WINAPI thread_do_response(void *thread_data)
 	SOCKET client_socket = data->client_socket;
 	World_Instance *world_instance = data->world_instance;
 	char *body = data->body_storage;
+
+	InterlockedIncrement(&active_thread_count);
 
 	Socket_Buffer buffer = buffer_new(client_socket);
 
@@ -376,7 +430,26 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			send(client_socket, separator, (int)strlen(separator), 0);
 			send(client_socket, body, (int)strlen(body), 0);
 
-		} else {
+		} else if (!strcmp(path, "/stats")) {
+
+			EnterCriticalSection(&global_stats.lock);
+			int status = render_stats(&global_stats, body);
+			LeaveCriticalSection(&global_stats.lock);
+
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+
+		}  else {
 			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
 
 			const char *response_start = "HTTP/1.1 200 OK\r\n";
@@ -396,6 +469,9 @@ DWORD WINAPI thread_do_response(void *thread_data)
 
 	free(body);
 	free(thread_data);
+
+	InterlockedDecrement(&active_thread_count);
+
 	return 0;
 }
 
@@ -407,6 +483,10 @@ int main(int argc, char **argv)
 	QueryPerformanceFrequency(&performance_frequency);
 
 	signal(SIGINT, handle_kill);
+
+	global_stats.snapshot_count = 100;
+	global_stats.active_thread_counts = (long*)calloc(global_stats.snapshot_count, sizeof(long));
+	InitializeCriticalSection(&global_stats.lock);
 
 	struct addrinfo *addr = NULL;
 	struct addrinfo hints = { 0 };
@@ -472,6 +552,7 @@ int main(int argc, char **argv)
 	InitializeCriticalSection(&world_instance.lock);
 
 	CreateThread(NULL, NULL, thread_background_world_update, &world_instance, NULL, NULL);
+	CreateThread(NULL, NULL, thread_background_stat_update, &global_stats, NULL, NULL);
 
 	int thread_id = 0;
 
