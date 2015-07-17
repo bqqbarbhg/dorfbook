@@ -62,7 +62,8 @@ void update_to_now(World_Instance *world_instance)
 	I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
 	float ms = (float)ticks / 100.0f;
 
-	printf("Updated world %d ticks: Took %.2fms\n", count, ms);
+	if (count > 0)
+		printf("Updated world %d ticks: Took %.2fms\n", count, ms);
 }
 
 DWORD WINAPI thread_background_world_update(void *world_instance_ptr)
@@ -82,6 +83,7 @@ struct Response_Thread_Data
 	SOCKET client_socket;
 	World_Instance *world_instance;
 	char *body_storage;
+	int thread_id;
 };
 
 struct Socket_Buffer
@@ -196,205 +198,197 @@ DWORD WINAPI thread_do_response(void *thread_data)
 	char *body = data->body_storage;
 
 	Socket_Buffer buffer = buffer_new(client_socket);
-	char line[256];
 
-	buffer_read_line(&buffer, line, sizeof(line));
+	for (;;) {
 
-	char method[64];
-	char path[128];
-	char http_version[32];
-	sscanf(line, "%s %s %s\r\n", method, path, http_version);
-
-	printf("Request to path %s %s\n", method, path);
-
-	while (strlen(line)) {
+		char line[256];
 		buffer_read_line(&buffer, line, sizeof(line));
-		printf("%s\n", line);
-	}
 
-	LARGE_INTEGER begin, end;
-	QueryPerformanceCounter(&begin);
+		char method[64];
+		char path[128];
+		char http_version[32];
+		sscanf(line, "%s %s %s\r\n", method, path, http_version);
 
-	U32 id;
+		printf("%d: Request to path %s %s\n", data->thread_id, method, path);
 
-	if (!strcmp(path, "/favicon.ico")) {
-		puts("Serving favicon");
-
-		FILE *icon = fopen("data/icon.ico", "rb");
-		fseek(icon, 0, SEEK_END);
-		int size = ftell(icon);
-		fseek(icon, 0, SEEK_SET);
-
-		const char *response_start = "HTTP/1.1 200 OK\r\n";
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", size);
-		const char *content_type = "Content-Type: image/x-icon\r\n";
-		const char *separator = "\r\n";
-
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, content_type, (int)strlen(content_type), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-
-		while (!feof(icon)) {
-			char iconbuf[512];
-			int num = (int)fread(iconbuf, 1, sizeof(iconbuf), icon);
-
-			send(client_socket, iconbuf, num, 0);
+		while (strlen(line)) {
+			buffer_read_line(&buffer, line, sizeof(line));
 		}
 
-		fclose(icon);
+		U32 id;
+		if (!strcmp(path, "/favicon.ico")) {
+			FILE *icon = fopen("data/icon.ico", "rb");
+			fseek(icon, 0, SEEK_END);
+			int size = ftell(icon);
+			fseek(icon, 0, SEEK_SET);
 
-	} else if (!strcmp(path, "/dwarves")) {
+			const char *response_start = "HTTP/1.1 200 OK\r\n";
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", size);
+			const char *content_type = "Content-Type: image/x-icon\r\n";
+			const char *separator = "\r\n";
 
-		EnterCriticalSection(&world_instance->lock);
-		update_to_now(world_instance);
-		int status = render_dwarves(world_instance->world, body);
-		LeaveCriticalSection(&world_instance->lock);
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, content_type, (int)strlen(content_type), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
 
-		const char *status_desc = get_http_status_description(status);
-		char response_start[128];
-		sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+			while (!feof(icon)) {
+				char iconbuf[512];
+				int num = (int)fread(iconbuf, 1, sizeof(iconbuf), icon);
 
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-		const char *separator = "\r\n";
+				send(client_socket, iconbuf, num, 0);
+			}
 
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-		send(client_socket, body, (int)strlen(body), 0);
+			fclose(icon);
 
-	} else if (!strcmp(path, "/feed")) {
+		} else if (!strcmp(path, "/dwarves")) {
 
-		EnterCriticalSection(&world_instance->lock);
-		update_to_now(world_instance);
-		int status = render_feed(world_instance->world, body);
-		LeaveCriticalSection(&world_instance->lock);
+			EnterCriticalSection(&world_instance->lock);
+			update_to_now(world_instance);
+			int status = render_dwarves(world_instance->world, body);
+			LeaveCriticalSection(&world_instance->lock);
 
-		const char *status_desc = get_http_status_description(status);
-		char response_start[128];
-		sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
 
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-		const char *separator = "\r\n";
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
 
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-		send(client_socket, body, (int)strlen(body), 0);
-	
-		// TODO: Seriously need a real routing scheme
-	} else if (sscanf(path, "/entities/%d", &id) == 1 && strstr(path, "avatar.svg")) {
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
 
-		EnterCriticalSection(&world_instance->lock);
-		update_to_now(world_instance);
-		int status = render_entity_avatar(world_instance->world, id, body);
-		LeaveCriticalSection(&world_instance->lock);
+		} else if (!strcmp(path, "/feed")) {
 
-		const char *status_desc = get_http_status_description(status);
-		char response_start[128];
-		sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+			EnterCriticalSection(&world_instance->lock);
+			update_to_now(world_instance);
+			int status = render_feed(world_instance->world, body);
+			LeaveCriticalSection(&world_instance->lock);
 
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-		const char *separator = "\r\n";
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
 
-		const char *content_type = "Content-Type: image/svg+xml\r\n";
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
 
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, content_type, (int)strlen(content_type), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-		send(client_socket, body, (int)strlen(body), 0);
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+		
+			// TODO: Seriously need a real routing scheme
+		} else if (sscanf(path, "/entities/%d", &id) == 1 && strstr(path, "avatar.svg")) {
 
-	} else if (sscanf(path, "/entities/%d", &id) == 1) {
+			EnterCriticalSection(&world_instance->lock);
+			update_to_now(world_instance);
+			int status = render_entity_avatar(world_instance->world, id, body);
+			LeaveCriticalSection(&world_instance->lock);
 
-		EnterCriticalSection(&world_instance->lock);
-		update_to_now(world_instance);
-		int status = render_entity(world_instance->world, id, body);
-		LeaveCriticalSection(&world_instance->lock);
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
 
-		const char *status_desc = get_http_status_description(status);
-		char response_start[128];
-		sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
 
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-		const char *separator = "\r\n";
+			const char *content_type = "Content-Type: image/svg+xml\r\n";
 
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-		send(client_socket, body, (int)strlen(body), 0);
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, content_type, (int)strlen(content_type), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
 
-	} else if (!strcmp(path, "/locations")) {
+		} else if (sscanf(path, "/entities/%d", &id) == 1) {
 
-		EnterCriticalSection(&world_instance->lock);
-		update_to_now(world_instance);
-		int status = render_locations(world_instance->world, body);
-		LeaveCriticalSection(&world_instance->lock);
+			EnterCriticalSection(&world_instance->lock);
+			update_to_now(world_instance);
+			int status = render_entity(world_instance->world, id, body);
+			LeaveCriticalSection(&world_instance->lock);
 
-		const char *status_desc = get_http_status_description(status);
-		char response_start[128];
-		sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
 
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-		const char *separator = "\r\n";
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
 
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-		send(client_socket, body, (int)strlen(body), 0);
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
 
-	} else if (sscanf(path, "/locations/%d", &id) == 1) {
+		} else if (!strcmp(path, "/locations")) {
 
-		EnterCriticalSection(&world_instance->lock);
-		update_to_now(world_instance);
-		int status = render_location(world_instance->world, id, body);
-		LeaveCriticalSection(&world_instance->lock);
+			EnterCriticalSection(&world_instance->lock);
+			update_to_now(world_instance);
+			int status = render_locations(world_instance->world, body);
+			LeaveCriticalSection(&world_instance->lock);
 
-		const char *status_desc = get_http_status_description(status);
-		char response_start[128];
-		sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
 
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-		const char *separator = "\r\n";
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
 
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-		send(client_socket, body, (int)strlen(body), 0);
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
 
-	} else {
-		const char *body = "<html><body><h1>Hello world!</h1></body></html>";
+		} else if (sscanf(path, "/locations/%d", &id) == 1) {
 
-		const char *response_start = "HTTP/1.1 200 OK\r\n";
-		char content_length[128];
-		sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-		const char *separator = "\r\n";
+			EnterCriticalSection(&world_instance->lock);
+			update_to_now(world_instance);
+			int status = render_location(world_instance->world, id, body);
+			LeaveCriticalSection(&world_instance->lock);
 
-		send(client_socket, response_start, (int)strlen(response_start), 0);
-		send(client_socket, content_length, (int)strlen(content_length), 0);
-		send(client_socket, separator, (int)strlen(separator), 0);
-		send(client_socket, body, (int)strlen(body), 0);
+			const char *status_desc = get_http_status_description(status);
+			char response_start[128];
+			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+
+		} else {
+			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
+
+			const char *response_start = "HTTP/1.1 200 OK\r\n";
+			char content_length[128];
+			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
+			const char *separator = "\r\n";
+
+			send(client_socket, response_start, (int)strlen(response_start), 0);
+			send(client_socket, content_length, (int)strlen(content_length), 0);
+			send(client_socket, separator, (int)strlen(separator), 0);
+			send(client_socket, body, (int)strlen(body), 0);
+		}
 	}
 
+	/*
 	buffer_free(&buffer);
 	closesocket(client_socket);
-
-	QueryPerformanceCounter(&end);
-	I64 diff = end.QuadPart - begin.QuadPart;
-	I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
-	float ms = (float)ticks / 100.0f;
-	printf("> Took %.2f ms\n", ms);
 
 	free(body);
 	free(thread_data);
 	return 0;
+	*/
 }
 
 int main(int argc, char **argv)
@@ -471,6 +465,8 @@ int main(int argc, char **argv)
 
 	CreateThread(NULL, NULL, thread_background_world_update, &world_instance, NULL, NULL);
 
+	int thread_id = 0;
+
 	for (;;) {
 		SOCKET client_socket = accept(server_socket, NULL, NULL);
 		if (client_socket == INVALID_SOCKET)
@@ -480,6 +476,7 @@ int main(int argc, char **argv)
 		thread_data->client_socket = client_socket;
 		thread_data->world_instance = &world_instance;
 		thread_data->body_storage = (char*)malloc(1024*1024);
+		thread_data->thread_id = ++thread_id;
 		
 #if 1
 		CreateThread(NULL, NULL, thread_do_response, thread_data, NULL, NULL);
