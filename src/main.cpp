@@ -99,7 +99,7 @@ struct Read_Block
 	int length;
 };
 
-Socket_Buffer buffer_new(SOCKET socket, int size=16)
+Socket_Buffer buffer_new(SOCKET socket, int size=1024)
 {
 	Socket_Buffer buffer = { 0 };
 	buffer.socket = socket;
