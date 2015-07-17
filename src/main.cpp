@@ -369,7 +369,11 @@ int main(int argc, char **argv)
 		thread_data->world_instance = &world_instance;
 		thread_data->body_storage = (char*)malloc(1024*1024);
 		
+#if 1
 		CreateThread(NULL, NULL, thread_do_response, thread_data, NULL, NULL);
+#else
+		thread_do_response(thread_data);
+#endif
 	}
 }
 
