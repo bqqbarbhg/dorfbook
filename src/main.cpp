@@ -65,7 +65,7 @@ void update_to_now(World_Instance *world_instance)
 	printf("Updated world %d ticks: Took %.2fms\n", count, ms);
 }
 
-DWORD WINAPI UpdateThread(void *world_instance_ptr)
+DWORD WINAPI thread_background_world_update(void *world_instance_ptr)
 {
 	World_Instance *world_instance = (World_Instance*)world_instance_ptr;
 
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 	world_instance.world = &world;
 	InitializeCriticalSection(&world_instance.lock);
 
-	CreateThread(NULL, NULL, UpdateThread, &world_instance, NULL, NULL);
+	CreateThread(NULL, NULL, thread_background_world_update, &world_instance, NULL, NULL);
 
 	for (;;) {
 		SOCKET client_socket = accept(server_socket, NULL, NULL);
