@@ -112,14 +112,33 @@ int render_stats(Server_Stats *stats, char *body)
 	ptr += sprintf(ptr, "<html><head><title>Server stats</title></head><body>");
 	ptr += sprintf(ptr, "<h5>Active thread count</h5>");
 	ptr += sprintf(ptr, "<svg width=\"400\" height=\"200\">\n");
+
+	long max_thread_count = 1;
+	for (U32 i = 0; i < stats->snapshot_count; i++) {
+		max_thread_count = max(max_thread_count, stats->active_thread_counts[i]);
+	}
+
+	long ruler_size = (long)ceilf((float)max_thread_count / 5);
+	long ruler_count = max_thread_count / ruler_size + 1;
+	long graph_height = ruler_count * ruler_size;
+	for (long i = 0; i <= ruler_count; i++) {
+		long value = i * ruler_size;
+		float y = 195.0f - (float)value / graph_height * 170.0f;
+		ptr += sprintf(ptr, "<path d=\"M30 %f L400 %f\" stroke=\"#ddd\" stroke-width=\"1\""
+			" fill=\"none\" />\n", y, y);
+		ptr += sprintf(ptr, "<text x=\"25\" y=\"%f\" text-anchor=\"end\" "
+			"fill=\"gray\">%d</text>", y + 4.0f, value);
+	}
+
 	ptr += sprintf(ptr, "<path d=\"");
 	char command_char = 'M';
 	for (U32 i = 0; i < stats->snapshot_count; i++) {
 		int snapshot_index = (stats->snapshot_index - 1 - i + stats->snapshot_count)
 			% stats->snapshot_count;
 
-		float x = ((float)i / stats->snapshot_count) * 400.0f;
-		float y = 195.0f - ((float)stats->active_thread_counts[snapshot_index] * 5);
+		float x = 400.0f - ((float)i / (stats->snapshot_count - 1)) * 370.0f;
+		float y = 195.0f - (float)stats->active_thread_counts[snapshot_index]
+			/ graph_height * 170.0f;
 
 		ptr += sprintf(ptr, "%c%f %f ", command_char, x, y);
 		command_char = 'L';

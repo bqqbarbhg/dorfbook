@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
 typedef int32_t I32;
 typedef uint32_t U32;
 typedef int64_t I64;
