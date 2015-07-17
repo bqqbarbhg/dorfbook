@@ -116,21 +116,20 @@ void buffer_free(Socket_Buffer *buffer)
 	free(buffer->data);
 }
 
-void buffer_fill_read(Socket_Buffer *buffer)
+bool buffer_fill_read(Socket_Buffer *buffer)
 {
 	int bytes_read = recv(buffer->socket, buffer->data, buffer->data_size, 0);
 	buffer->size = bytes_read;
 	buffer->pos = 0;
+	return bytes_read > 0;
 }
 
 bool buffer_peek(Socket_Buffer *buffer, Read_Block *block, int length)
 {
-	if (length == 0)
-		return false;
-
 	int buffer_left = buffer->size - buffer->pos;
 	if (buffer_left == 0) {
-		buffer_fill_read(buffer);
+		if (!buffer_fill_read(buffer))
+			return false;
 		buffer_left = buffer->size - buffer->pos;
 	}
 
@@ -151,7 +150,9 @@ bool buffer_accept(Socket_Buffer *buffer, char *value, int length)
 {
 	int pos = 0;
 	Read_Block block;
-	while (buffer_read(buffer, &block, length - pos)) {
+	while (length - pos > 0) {
+		if (!buffer_read(buffer, &block, length - pos))
+			return false;
 		if (memcmp(block.data, value + pos, block.length))
 			return false;
 		pos += block.length;
@@ -163,7 +164,9 @@ int buffer_read_line(Socket_Buffer *buffer, char *line, int length)
 {
 	int pos = 0;
 	Read_Block block;
-	while (buffer_peek(buffer, &block, length - pos)) {
+	while (length - pos > 0) {
+		if (!buffer_peek(buffer, &block, length - pos)) return -3;
+
 		char *end = (char*)memchr(block.data, '\r', block.length);
 		if (end) {
 			int in_length = (int)(end - block.data);
@@ -202,7 +205,8 @@ DWORD WINAPI thread_do_response(void *thread_data)
 	for (;;) {
 
 		char line[256];
-		buffer_read_line(&buffer, line, sizeof(line));
+		if (buffer_read_line(&buffer, line, sizeof(line)) < 0)
+			break;
 
 		char method[64];
 		char path[128];
@@ -211,9 +215,15 @@ DWORD WINAPI thread_do_response(void *thread_data)
 
 		printf("%d: Request to path %s %s\n", data->thread_id, method, path);
 
+		bool failed = false;
 		while (strlen(line)) {
-			buffer_read_line(&buffer, line, sizeof(line));
+			if (buffer_read_line(&buffer, line, sizeof(line)) < 0) {
+				failed = true;
+				break;
+			}
 		}
+		if (failed)
+			break;
 
 		U32 id;
 		if (!strcmp(path, "/favicon.ico")) {
@@ -381,14 +391,12 @@ DWORD WINAPI thread_do_response(void *thread_data)
 		}
 	}
 
-	/*
 	buffer_free(&buffer);
 	closesocket(client_socket);
 
 	free(body);
 	free(thread_data);
 	return 0;
-	*/
 }
 
 int main(int argc, char **argv)
@@ -472,12 +480,19 @@ int main(int argc, char **argv)
 		if (client_socket == INVALID_SOCKET)
 			continue;
 
+		DWORD timeout = 3 * 1000;
+		int err;
+		if (err = setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout)))
+			printf("Failed to set send timeout: %d\n", err);
+		if (err = setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)))
+			printf("Failed to set recv timeout: %d\n", err);
+
 		Response_Thread_Data *thread_data = (Response_Thread_Data*)malloc(sizeof(Response_Thread_Data));
 		thread_data->client_socket = client_socket;
 		thread_data->world_instance = &world_instance;
 		thread_data->body_storage = (char*)malloc(1024*1024);
 		thread_data->thread_id = ++thread_id;
-		
+
 #if 1
 		CreateThread(NULL, NULL, thread_do_response, thread_data, NULL, NULL);
 #else
