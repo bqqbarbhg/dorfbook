@@ -119,7 +119,7 @@ int render_stats(Server_Stats *stats, char *body)
 			% stats->snapshot_count;
 
 		float x = ((float)i / stats->snapshot_count) * 400.0f;
-		float y = 200.0f - ((float)stats->active_thread_counts[snapshot_index] * 5);
+		float y = 195.0f - ((float)stats->active_thread_counts[snapshot_index] * 5);
 
 		ptr += sprintf(ptr, "%c%f %f ", command_char, x, y);
 		command_char = 'L';
