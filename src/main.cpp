@@ -38,14 +38,14 @@ void handle_kill(int signal)
 	exit(0);
 }
 
-struct WorldInstance
+struct World_Instance
 {
 	World *world;
 	CRITICAL_SECTION lock;
 	time_t last_updated;
 };
 
-void update_to_now(WorldInstance *world_instance)
+void update_to_now(World_Instance *world_instance)
 {
 	LARGE_INTEGER begin, end;
 	QueryPerformanceCounter(&begin);
@@ -67,7 +67,7 @@ void update_to_now(WorldInstance *world_instance)
 
 DWORD WINAPI UpdateThread(void *world_instance_ptr)
 {
-	WorldInstance *world_instance = (WorldInstance*)world_instance_ptr;
+	World_Instance *world_instance = (World_Instance*)world_instance_ptr;
 
 	for (;;) {
 		EnterCriticalSection(&world_instance->lock);
@@ -144,7 +144,7 @@ int main(int argc, char **argv)
 		dwarf->seed = next32(&world.random_series);
 	}
 
-	WorldInstance world_instance = { 0 };
+	World_Instance world_instance = { 0 };
 	world_instance.last_updated = time(NULL);
 	world_instance.world = &world;
 	InitializeCriticalSection(&world_instance.lock);
