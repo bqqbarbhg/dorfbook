@@ -264,6 +264,32 @@ int buffer_read_line(Socket_Buffer *buffer, char *line, int length)
 	return -1;
 }
 
+void send_response(SOCKET socket, const char *content_type, int status,
+	const char *body, size_t body_length)
+{
+	const char *status_desc = get_http_status_description(status);
+	char response_start[128];
+	sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
+
+	char content_length_header[128];
+	sprintf(content_length_header, "Content-Length: %d\r\n", body_length);
+	char content_type_header[128];
+	sprintf(content_type_header, "Content-Type: %s\r\n", content_type);
+	const char *separator = "\r\n";
+
+	send(socket, response_start, (int)strlen(response_start), 0);
+	send(socket, content_length_header, (int)strlen(content_length_header), 0);
+	send(socket, content_type_header, (int)strlen(content_type_header), 0);
+	send(socket, separator, (int)strlen(separator), 0);
+	send(socket, body, (int)strlen(body), 0);
+}
+
+void send_text_response(SOCKET socket, const char *content_type, int status,
+	const char *body)
+{
+	send_response(socket, content_type, status, body, strlen(body));
+}
+
 DWORD WINAPI thread_do_response(void *thread_data)
 {
 	Response_Thread_Data *data = (Response_Thread_Data*)thread_data;
@@ -332,18 +358,7 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			int status = render_dwarves(world_instance->world, body);
 			LeaveCriticalSection(&world_instance->lock);
 
-			const char *status_desc = get_http_status_description(status);
-			char response_start[128];
-			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
-
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_response(client_socket, "text/html", status, body, strlen(body));
 
 		} else if (!strcmp(path, "/feed")) {
 
@@ -352,18 +367,7 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			int status = render_feed(world_instance->world, body);
 			LeaveCriticalSection(&world_instance->lock);
 
-			const char *status_desc = get_http_status_description(status);
-			char response_start[128];
-			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
-
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_text_response(client_socket, "text/html", status, body);
 		
 			// TODO: Seriously need a real routing scheme
 		} else if (sscanf(path, "/entities/%d", &id) == 1 && strstr(path, "avatar.svg")) {
@@ -373,21 +377,7 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			int status = render_entity_avatar(world_instance->world, id, body);
 			LeaveCriticalSection(&world_instance->lock);
 
-			const char *status_desc = get_http_status_description(status);
-			char response_start[128];
-			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
-
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			const char *content_type = "Content-Type: image/svg+xml\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, content_type, (int)strlen(content_type), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_text_response(client_socket, "image/svg+xml", status, body);
 
 		} else if (sscanf(path, "/entities/%d", &id) == 1) {
 
@@ -396,18 +386,7 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			int status = render_entity(world_instance->world, id, body);
 			LeaveCriticalSection(&world_instance->lock);
 
-			const char *status_desc = get_http_status_description(status);
-			char response_start[128];
-			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
-
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (!strcmp(path, "/locations")) {
 
@@ -416,18 +395,7 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			int status = render_locations(world_instance->world, body);
 			LeaveCriticalSection(&world_instance->lock);
 
-			const char *status_desc = get_http_status_description(status);
-			char response_start[128];
-			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
-
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (sscanf(path, "/locations/%d", &id) == 1) {
 
@@ -436,18 +404,7 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			int status = render_location(world_instance->world, id, body);
 			LeaveCriticalSection(&world_instance->lock);
 
-			const char *status_desc = get_http_status_description(status);
-			char response_start[128];
-			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
-
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (!strcmp(path, "/stats")) {
 
@@ -455,31 +412,11 @@ DWORD WINAPI thread_do_response(void *thread_data)
 			int status = render_stats(&global_stats, body);
 			LeaveCriticalSection(&global_stats.lock);
 
-			const char *status_desc = get_http_status_description(status);
-			char response_start[128];
-			sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
-
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_text_response(client_socket, "text/html", status, body);
 
 		}  else {
 			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
-
-			const char *response_start = "HTTP/1.1 200 OK\r\n";
-			char content_length[128];
-			sprintf(content_length, "Content-Length: %d\r\n", strlen(body));
-			const char *separator = "\r\n";
-
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
-			send(client_socket, body, (int)strlen(body), 0);
+			send_text_response(client_socket, "text/html", 200, body);
 		}
 	}
 
