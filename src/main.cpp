@@ -217,7 +217,7 @@ bool buffer_read(Socket_Buffer *buffer, Read_Block *block, int length)
 	return true;
 }
 
-bool buffer_accept(Socket_Buffer *buffer, char *value, int length)
+bool buffer_accept(Socket_Buffer *buffer, const char *value, int length)
 {
 	int pos = 0;
 	Read_Block block;
