@@ -1,15 +1,20 @@
 #include <stdio.h>
-#include <WinSock2.h>
-#include <ws2tcpip.h>
-#include <Windows.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <time.h>
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <pthread.h>
+
 #define DORF_PORT "3500"
 
+typedef int SOCKET;
+
 SOCKET server_socket;
-LARGE_INTEGER performance_frequency;
 
 volatile long active_thread_count;
 
@@ -18,7 +23,7 @@ struct Server_Stats
 	U32 snapshot_count;
 	U32 snapshot_index;
 	long *active_thread_counts;
-	CRITICAL_SECTION lock;
+	pthread_mutex_t lock;
 };
 
 Server_Stats global_stats;
@@ -44,24 +49,20 @@ void handle_kill(int signal)
 {
 	puts("server is kill");
 
-	closesocket(server_socket);
+	shutdown(server_socket, 2);
 	
-	WSACleanup();
 	exit(0);
 }
 
 struct World_Instance
 {
 	World *world;
-	CRITICAL_SECTION lock;
+	pthread_mutex_t lock;
 	time_t last_updated;
 };
 
 void update_to_now(World_Instance *world_instance)
 {
-	LARGE_INTEGER begin, end;
-	QueryPerformanceCounter(&begin);
-
 	int count = 0;
 	time_t now = time(NULL);
 	while (world_instance->last_updated < now) {
@@ -69,39 +70,33 @@ void update_to_now(World_Instance *world_instance)
 		world_tick(world_instance->world);
 		world_instance->last_updated++;
 	}
-	QueryPerformanceCounter(&end);
-	I64 diff = end.QuadPart - begin.QuadPart;
-	I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
-	float ms = (float)ticks / 100.0f;
-
-	if (count > 0)
-		printf("Updated world %d ticks: Took %.2fms\n", count, ms);
 }
 
-DWORD WINAPI thread_background_world_update(void *world_instance_ptr)
+void *thread_background_world_update(void *world_instance_ptr)
 {
 	World_Instance *world_instance = (World_Instance*)world_instance_ptr;
 
 	for (;;) {
-		EnterCriticalSection(&world_instance->lock);
+		pthread_mutex_lock(&world_instance->lock);
 		update_to_now(world_instance);
-		LeaveCriticalSection(&world_instance->lock);
-		Sleep(10000);
+		pthread_mutex_unlock(&world_instance->lock);
+
+		sleep(10);
 	}
 }
 
-DWORD WINAPI thread_background_stat_update(void *server_stats)
+void *thread_background_stat_update(void *server_stats)
 {
 	Server_Stats *stats = (Server_Stats*)server_stats;
 	for (;;) {
 
-		EnterCriticalSection(&stats->lock);
+		pthread_mutex_lock(&stats->lock);
 		stats->active_thread_counts[stats->snapshot_index] = active_thread_count;
 
 		stats->snapshot_index = (stats->snapshot_index + 1) % stats->snapshot_count;
-		LeaveCriticalSection(&stats->lock);
+		pthread_mutex_unlock(&stats->lock);
 
-		Sleep(1000);
+		sleep(1);
 	}
 }
 
@@ -217,7 +212,7 @@ bool buffer_read(Socket_Buffer *buffer, Read_Block *block, int length)
 	return true;
 }
 
-bool buffer_accept(Socket_Buffer *buffer, char *value, int length)
+bool buffer_accept(Socket_Buffer *buffer, const char *value, int length)
 {
 	int pos = 0;
 	Read_Block block;
@@ -290,14 +285,14 @@ void send_text_response(SOCKET socket, const char *content_type, int status,
 	send_response(socket, content_type, status, body, strlen(body));
 }
 
-DWORD WINAPI thread_do_response(void *thread_data)
+void *thread_do_response(void *thread_data)
 {
 	Response_Thread_Data *data = (Response_Thread_Data*)thread_data;
 	SOCKET client_socket = data->client_socket;
 	World_Instance *world_instance = data->world_instance;
 	char *body = data->body_storage;
 
-	InterlockedIncrement(&active_thread_count);
+	__sync_fetch_and_add(&active_thread_count, 1);
 
 	Socket_Buffer buffer = buffer_new(client_socket);
 
@@ -353,64 +348,64 @@ DWORD WINAPI thread_do_response(void *thread_data)
 
 		} else if (!strcmp(path, "/dwarves")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			pthread_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_dwarves(world_instance->world, body);
-			LeaveCriticalSection(&world_instance->lock);
+			pthread_mutex_unlock(&world_instance->lock);
 
 			send_response(client_socket, "text/html", status, body, strlen(body));
 
 		} else if (!strcmp(path, "/feed")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			pthread_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_feed(world_instance->world, body);
-			LeaveCriticalSection(&world_instance->lock);
+			pthread_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 		
 			// TODO: Seriously need a real routing scheme
 		} else if (sscanf(path, "/entities/%d", &id) == 1 && strstr(path, "avatar.svg")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			pthread_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_entity_avatar(world_instance->world, id, body);
-			LeaveCriticalSection(&world_instance->lock);
+			pthread_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "image/svg+xml", status, body);
 
 		} else if (sscanf(path, "/entities/%d", &id) == 1) {
 
-			EnterCriticalSection(&world_instance->lock);
+			pthread_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_entity(world_instance->world, id, body);
-			LeaveCriticalSection(&world_instance->lock);
+			pthread_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (!strcmp(path, "/locations")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			pthread_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_locations(world_instance->world, body);
-			LeaveCriticalSection(&world_instance->lock);
+			pthread_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (sscanf(path, "/locations/%d", &id) == 1) {
 
-			EnterCriticalSection(&world_instance->lock);
+			pthread_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_location(world_instance->world, id, body);
-			LeaveCriticalSection(&world_instance->lock);
+			pthread_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (!strcmp(path, "/stats")) {
 
-			EnterCriticalSection(&global_stats.lock);
+			pthread_mutex_lock(&global_stats.lock);
 			int status = render_stats(&global_stats, body);
-			LeaveCriticalSection(&global_stats.lock);
+			pthread_mutex_unlock(&global_stats.lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
@@ -421,28 +416,21 @@ DWORD WINAPI thread_do_response(void *thread_data)
 	}
 
 	buffer_free(&buffer);
-	closesocket(client_socket);
+	shutdown(client_socket, 2);
 
 	free(body);
 	free(thread_data);
 
-	InterlockedDecrement(&active_thread_count);
-
-	return 0;
+	__sync_fetch_and_sub(&active_thread_count, 1);
 }
 
 int main(int argc, char **argv)
 {
-	WSADATA wsadata;
-	WSAStartup(0x0202, &wsadata);
-
-	QueryPerformanceFrequency(&performance_frequency);
-
 	signal(SIGINT, handle_kill);
 
 	global_stats.snapshot_count = 100;
 	global_stats.active_thread_counts = (long*)calloc(global_stats.snapshot_count, sizeof(long));
-	InitializeCriticalSection(&global_stats.lock);
+	pthread_mutex_init(&global_stats.lock, 0);
 
 	struct addrinfo *addr = NULL;
 	struct addrinfo hints = { 0 };
@@ -454,11 +442,11 @@ int main(int argc, char **argv)
 	getaddrinfo(NULL, DORF_PORT, &hints, &addr);
 
 	server_socket = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-	if (bind(server_socket, addr->ai_addr, (int)addr->ai_addrlen) == SOCKET_ERROR) {
-		printf("bind failed: %d", WSAGetLastError());
+	if (bind(server_socket, addr->ai_addr, (int)addr->ai_addrlen) == -1) {
+		printf("bind failed: %d", errno);
 	}
-	if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
-		printf("listen failed: %d", WSAGetLastError());
+	if (listen(server_socket, SOMAXCONN) == -1) {
+		printf("listen failed: %d", errno);
 	}
 
 	freeaddrinfo(addr);
@@ -505,19 +493,21 @@ int main(int argc, char **argv)
 	World_Instance world_instance = { 0 };
 	world_instance.last_updated = time(NULL);
 	world_instance.world = &world;
-	InitializeCriticalSection(&world_instance.lock);
+	pthread_mutex_init(&world_instance.lock, 0);
 
-	CreateThread(NULL, NULL, thread_background_world_update, &world_instance, NULL, NULL);
-	CreateThread(NULL, NULL, thread_background_stat_update, &global_stats, NULL, NULL);
+	pthread_t world_update_thread, stat_update_thread;
+
+	pthread_create(&world_update_thread, 0, thread_background_world_update, &world_instance);
+	pthread_create(&stat_update_thread, 0, thread_background_stat_update, &global_stats);
 
 	int thread_id = 0;
 
 	for (;;) {
 		SOCKET client_socket = accept(server_socket, NULL, NULL);
-		if (client_socket == INVALID_SOCKET)
+		if (client_socket == -1)
 			continue;
 
-		DWORD timeout = 15 * 1000; // 15 seconds
+		int timeout = 15 * 1000; // 15 seconds
 		int err;
 		if (err = setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout)))
 			printf("Failed to set send timeout: %d\n", err);
@@ -531,7 +521,8 @@ int main(int argc, char **argv)
 		thread_data->thread_id = ++thread_id;
 
 #if 1
-		CreateThread(NULL, NULL, thread_do_response, thread_data, NULL, NULL);
+		pthread_t response_thread;
+		pthread_create(&response_thread, 0, thread_do_response, thread_data);
 #else
 		thread_do_response(thread_data);
 #endif

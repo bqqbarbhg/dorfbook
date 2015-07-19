@@ -3,6 +3,6 @@
 mkdir bin 2> /dev/null
 mkdir data 2> /dev/null
 
-gcc src/build.cpp -o bin/dorfbook
+g++ src/build.cpp -pthread -std=c++0x -o bin/dorfbook
 cp -r data bin
 
