@@ -510,7 +510,7 @@ int main(int argc, char **argv)
 		if (os_valid_socket(client_socket))
 			continue;
 
-		DWORD timeout = 15 * 1000; // 15 seconds
+		int timeout = 15 * 1000; // 15 seconds
 		int err;
 		if (err = setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout)))
 			printf("Failed to set send timeout: %d\n", err);
