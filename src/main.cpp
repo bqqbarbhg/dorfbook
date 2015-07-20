@@ -445,11 +445,11 @@ int main(int argc, char **argv)
 	getaddrinfo(NULL, DORF_PORT, &hints, &addr);
 
 	server_socket = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-	if (bind(server_socket, addr->ai_addr, (int)addr->ai_addrlen) == SOCKET_ERROR) {
+	if (bind(server_socket, addr->ai_addr, (int)addr->ai_addrlen)) {
 		os_socket_format_last_error(err_buffer, sizeof(err_buffer));
 		printf("Failed to bind socket: %s\n", err_buffer);
 	}
-	if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
+	if (listen(server_socket, SOMAXCONN)) {
 		os_socket_format_last_error(err_buffer, sizeof(err_buffer));
 		printf("Failed to bind socket: %s\n", err_buffer);
 	}
@@ -506,8 +506,8 @@ int main(int argc, char **argv)
 	int thread_id = 0;
 
 	for (;;) {
-		SOCKET client_socket = accept(server_socket, NULL, NULL);
-		if (client_socket == INVALID_SOCKET)
+		os_socket client_socket = accept(server_socket, NULL, NULL);
+		if (os_valid_socket(client_socket))
 			continue;
 
 		DWORD timeout = 15 * 1000; // 15 seconds

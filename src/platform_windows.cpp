@@ -1,4 +1,5 @@
 
+#define NOMINMAX
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
@@ -29,6 +30,11 @@ enum Close_Mode
 	Close_Write,
 	Close_ReadWrite,
 };
+
+inline bool os_valid_socket(os_socket sock)
+{
+	return sock != INVALID_SOCKET;
+}
 
 void os_socket_format_last_error(char *buffer, U32 buffer_length)
 {
