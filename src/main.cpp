@@ -507,7 +507,7 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		os_socket client_socket = accept(server_socket, NULL, NULL);
-		if (os_valid_socket(client_socket))
+		if (!os_valid_socket(client_socket))
 			continue;
 
 		int timeout = 15 * 1000; // 15 seconds
