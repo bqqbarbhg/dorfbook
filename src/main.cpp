@@ -6,8 +6,6 @@
 #define DORF_PORT "3500"
 
 os_socket server_socket;
-LARGE_INTEGER performance_frequency;
-
 os_atomic_uint32 active_thread_count;
 
 struct Server_Stats
@@ -15,7 +13,7 @@ struct Server_Stats
 	U32 snapshot_count;
 	U32 snapshot_index;
 	long *active_thread_counts;
-	CRITICAL_SECTION lock;
+	os_mutex lock;
 };
 
 Server_Stats global_stats;
@@ -166,7 +164,7 @@ struct Read_Block
 	int length;
 };
 
-Socket_Buffer buffer_new(SOCKET socket, int size=1024)
+Socket_Buffer buffer_new(os_socket socket, int size=1024)
 {
 	Socket_Buffer buffer = { 0 };
 	buffer.socket = socket;
@@ -258,7 +256,7 @@ int buffer_read_line(Socket_Buffer *buffer, char *line, int length)
 	return -1;
 }
 
-void send_response(SOCKET socket, const char *content_type, int status,
+void send_response(os_socket socket, const char *content_type, int status,
 	const char *body, size_t body_length)
 {
 	const char *status_desc = get_http_status_description(status);
@@ -278,7 +276,7 @@ void send_response(SOCKET socket, const char *content_type, int status,
 	send(socket, body, (int)strlen(body), 0);
 }
 
-void send_text_response(SOCKET socket, const char *content_type, int status,
+void send_text_response(os_socket socket, const char *content_type, int status,
 	const char *body)
 {
 	send_response(socket, content_type, status, body, strlen(body));
