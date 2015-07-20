@@ -1,17 +1,14 @@
 #include <stdio.h>
-#include <WinSock2.h>
-#include <ws2tcpip.h>
-#include <Windows.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <time.h>
 
 #define DORF_PORT "3500"
 
-SOCKET server_socket;
+os_socket server_socket;
 LARGE_INTEGER performance_frequency;
 
-volatile long active_thread_count;
+os_atomic_uint32 active_thread_count;
 
 struct Server_Stats
 {
@@ -44,16 +41,15 @@ void handle_kill(int signal)
 {
 	puts("server is kill");
 
-	closesocket(server_socket);
+	os_socket_close(server_socket, Close_ReadWrite);
 	
-	WSACleanup();
 	exit(0);
 }
 
 struct World_Instance
 {
 	World *world;
-	CRITICAL_SECTION lock;
+	os_mutex lock;
 	time_t last_updated;
 };
 
@@ -78,30 +74,30 @@ void update_to_now(World_Instance *world_instance)
 		printf("Updated world %d ticks: Took %.2fms\n", count, ms);
 }
 
-DWORD WINAPI thread_background_world_update(void *world_instance_ptr)
+OS_THREAD_ENTRY(thread_background_world_update, world_instance_ptr)
 {
 	World_Instance *world_instance = (World_Instance*)world_instance_ptr;
 
 	for (;;) {
-		EnterCriticalSection(&world_instance->lock);
+		os_mutex_lock(&world_instance->lock);
 		update_to_now(world_instance);
-		LeaveCriticalSection(&world_instance->lock);
-		Sleep(10000);
+		os_mutex_unlock(&world_instance->lock);
+		os_sleep_seconds(10);
 	}
 }
 
-DWORD WINAPI thread_background_stat_update(void *server_stats)
+OS_THREAD_ENTRY(thread_background_stat_update, server_stats)
 {
 	Server_Stats *stats = (Server_Stats*)server_stats;
 	for (;;) {
 
-		EnterCriticalSection(&stats->lock);
+		os_mutex_lock(&stats->lock);
 		stats->active_thread_counts[stats->snapshot_index] = active_thread_count;
 
 		stats->snapshot_index = (stats->snapshot_index + 1) % stats->snapshot_count;
-		LeaveCriticalSection(&stats->lock);
+		os_mutex_unlock(&stats->lock);
 
-		Sleep(1000);
+		os_sleep_seconds(1000);
 	}
 }
 
@@ -151,7 +147,7 @@ int render_stats(Server_Stats *stats, char *body)
 
 struct Response_Thread_Data
 {
-	SOCKET client_socket;
+	os_socket client_socket;
 	World_Instance *world_instance;
 	char *body_storage;
 	int thread_id;
@@ -159,7 +155,7 @@ struct Response_Thread_Data
 
 struct Socket_Buffer
 {
-	SOCKET socket;
+	os_socket socket;
 	char *data;
 	int data_size;
 	int pos;
@@ -290,14 +286,14 @@ void send_text_response(SOCKET socket, const char *content_type, int status,
 	send_response(socket, content_type, status, body, strlen(body));
 }
 
-DWORD WINAPI thread_do_response(void *thread_data)
+OS_THREAD_ENTRY(thread_do_response, thread_data)
 {
 	Response_Thread_Data *data = (Response_Thread_Data*)thread_data;
-	SOCKET client_socket = data->client_socket;
+	os_socket client_socket = data->client_socket;
 	World_Instance *world_instance = data->world_instance;
 	char *body = data->body_storage;
 
-	InterlockedIncrement(&active_thread_count);
+	os_atomic_increment(&active_thread_count);
 
 	Socket_Buffer buffer = buffer_new(client_socket);
 
@@ -353,64 +349,64 @@ DWORD WINAPI thread_do_response(void *thread_data)
 
 		} else if (!strcmp(path, "/dwarves")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			os_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_dwarves(world_instance->world, body);
-			LeaveCriticalSection(&world_instance->lock);
+			os_mutex_unlock(&world_instance->lock);
 
 			send_response(client_socket, "text/html", status, body, strlen(body));
 
 		} else if (!strcmp(path, "/feed")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			os_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_feed(world_instance->world, body);
-			LeaveCriticalSection(&world_instance->lock);
+			os_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 		
 			// TODO: Seriously need a real routing scheme
 		} else if (sscanf(path, "/entities/%d", &id) == 1 && strstr(path, "avatar.svg")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			os_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_entity_avatar(world_instance->world, id, body);
-			LeaveCriticalSection(&world_instance->lock);
+			os_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "image/svg+xml", status, body);
 
 		} else if (sscanf(path, "/entities/%d", &id) == 1) {
 
-			EnterCriticalSection(&world_instance->lock);
+			os_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_entity(world_instance->world, id, body);
-			LeaveCriticalSection(&world_instance->lock);
+			os_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (!strcmp(path, "/locations")) {
 
-			EnterCriticalSection(&world_instance->lock);
+			os_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_locations(world_instance->world, body);
-			LeaveCriticalSection(&world_instance->lock);
+			os_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (sscanf(path, "/locations/%d", &id) == 1) {
 
-			EnterCriticalSection(&world_instance->lock);
+			os_mutex_lock(&world_instance->lock);
 			update_to_now(world_instance);
 			int status = render_location(world_instance->world, id, body);
-			LeaveCriticalSection(&world_instance->lock);
+			os_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
 		} else if (!strcmp(path, "/stats")) {
 
-			EnterCriticalSection(&global_stats.lock);
+			os_mutex_lock(&global_stats.lock);
 			int status = render_stats(&global_stats, body);
-			LeaveCriticalSection(&global_stats.lock);
+			os_mutex_unlock(&global_stats.lock);
 
 			send_text_response(client_socket, "text/html", status, body);
 
@@ -421,20 +417,19 @@ DWORD WINAPI thread_do_response(void *thread_data)
 	}
 
 	buffer_free(&buffer);
-	closesocket(client_socket);
+	os_socket_close(client_socket, Close_Read);
 
 	free(body);
 	free(thread_data);
 
-	InterlockedDecrement(&active_thread_count);
+	os_atomic_decrement(&active_thread_count);
 
-	return 0;
+	OS_THREAD_RETURN;
 }
 
 int main(int argc, char **argv)
 {
-	WSADATA wsadata;
-	WSAStartup(0x0202, &wsadata);
+	os_net_startup();
 
 	QueryPerformanceFrequency(&performance_frequency);
 
@@ -442,7 +437,7 @@ int main(int argc, char **argv)
 
 	global_stats.snapshot_count = 100;
 	global_stats.active_thread_counts = (long*)calloc(global_stats.snapshot_count, sizeof(long));
-	InitializeCriticalSection(&global_stats.lock);
+	os_mutex_init(&global_stats.lock);
 
 	struct addrinfo *addr = NULL;
 	struct addrinfo hints = { 0 };
@@ -505,10 +500,10 @@ int main(int argc, char **argv)
 	World_Instance world_instance = { 0 };
 	world_instance.last_updated = time(NULL);
 	world_instance.world = &world;
-	InitializeCriticalSection(&world_instance.lock);
+	os_mutex_init(&world_instance.lock);
 
-	CreateThread(NULL, NULL, thread_background_world_update, &world_instance, NULL, NULL);
-	CreateThread(NULL, NULL, thread_background_stat_update, &global_stats, NULL, NULL);
+	os_thread_do(thread_background_world_update, &world_instance);
+	os_thread_do(thread_background_stat_update, &global_stats);
 
 	int thread_id = 0;
 
@@ -531,7 +526,7 @@ int main(int argc, char **argv)
 		thread_data->thread_id = ++thread_id;
 
 #if 1
-		CreateThread(NULL, NULL, thread_do_response, thread_data, NULL, NULL);
+		os_thread_do(thread_do_response, thread_data);
 #else
 		thread_do_response(thread_data);
 #endif
