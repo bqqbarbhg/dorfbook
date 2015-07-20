@@ -47,6 +47,11 @@ inline void os_mutex_unlock(os_mutex *mutex)
 	pthread_mutex_unlock(mutex);
 }
 
+inline void os_sleep_seconds(int seconds)
+{
+	sleep(seconds);
+}
+
 typedef volatile U32 os_atomic_uint32;
 
 inline void os_atomic_increment(os_atomic_int32 *value)
