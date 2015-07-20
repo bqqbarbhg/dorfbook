@@ -482,9 +482,12 @@ int main(int argc, char **argv)
 
 	for (U32 id = 1; id < 10; id++) {
 		char *name = name_ptr;
+
+		U32 first_name_index = next32(&world.random_series) % Count(names);
+		U32 last_name_index = next32(&world.random_series) % Count(names);
+
 		name_ptr += 1 + sprintf(name_ptr, "%s %sson",
-			names[next32(&world.random_series) % Count(names)],
-			names[next32(&world.random_series) % Count(names)]);
+			names[first_name_index], names[last_name_index]);
 
 		Dwarf *dwarf = &world.dwarves[id];
 		dwarf->id = id;
