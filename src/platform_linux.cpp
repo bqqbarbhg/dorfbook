@@ -5,6 +5,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <errno.h>
 
 typedef timespec os_timer_mark;
 
@@ -17,8 +18,8 @@ os_timer_mark os_get_timer()
 
 float os_timer_delta_ms(os_timer_mark begin, os_timer_mark end)
 {
-	time_t sec_diff = end.seconds - begin.seconds;
-	int nano_diff = end.nanoseconds - begin.nanoseconds;
+	time_t sec_diff = end.tv_sec - begin.tv_sec;
+	int nano_diff = end.tv_nsec - begin.tv_nsec;
 	float ms = sec_diff * 1000.0f + nano_diff / 1000000.0f;
 }
 
@@ -44,14 +45,14 @@ void os_socket_format_last_error(char *buffer, U32 buffer_length)
 
 void os_socket_close(os_socket sock, Close_Mode mode)
 {
-	shutdown((int)mode);
+	shutdown(sock, (int)mode);
 }
 
 typedef pthread_mutex_t os_mutex;
 
 inline void os_mutex_init(os_mutex *mutex)
 {
-	pthread_mutex_init(mutex);
+	pthread_mutex_init(mutex, 0);
 }
 
 inline void os_mutex_lock(os_mutex *mutex)
@@ -71,12 +72,12 @@ inline void os_sleep_seconds(int seconds)
 
 typedef volatile U32 os_atomic_uint32;
 
-inline void os_atomic_increment(os_atomic_int32 *value)
+inline void os_atomic_increment(os_atomic_uint32 *value)
 {
 	__sync_fetch_and_add(value, 1);
 }
 
-inline void os_atomic_decrement(os_atomic_int32 *value)
+inline void os_atomic_decrement(os_atomic_uint32 *value)
 {
 	__sync_fetch_and_sub(value, 1);
 }
@@ -85,6 +86,7 @@ inline void os_atomic_decrement(os_atomic_int32 *value)
 #define OS_THREAD_RETURN return 0
 
 typedef pthread_t os_thread;
+typedef void* (*os_thread_func)(void*);
 
 inline os_thread os_thread_do(os_thread_func func, void *param)
 {
