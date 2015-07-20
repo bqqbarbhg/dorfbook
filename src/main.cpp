@@ -425,7 +425,9 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 
 int main(int argc, char **argv)
 {
-	os_net_startup();
+	os_startup();
+
+	static char err_buffer[128];
 
 	signal(SIGINT, handle_kill);
 
@@ -444,10 +446,12 @@ int main(int argc, char **argv)
 
 	server_socket = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 	if (bind(server_socket, addr->ai_addr, (int)addr->ai_addrlen) == SOCKET_ERROR) {
-		printf("bind failed: %d", WSAGetLastError());
+		os_socket_format_last_error(err_buffer, sizeof(err_buffer));
+		printf("Failed to bind socket: %s\n", err_buffer);
 	}
 	if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
-		printf("listen failed: %d", WSAGetLastError());
+		os_socket_format_last_error(err_buffer, sizeof(err_buffer));
+		printf("Failed to bind socket: %s\n", err_buffer);
 	}
 
 	freeaddrinfo(addr);

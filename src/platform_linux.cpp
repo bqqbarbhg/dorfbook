@@ -31,6 +31,12 @@ enum Close_Mode
 	Close_ReadWrite = SHUT_RDWR,
 };
 
+void os_socket_format_last_error(char *buffer, U32 buffer_length)
+{
+	// TODO: Text errors for linux
+	snprintf(buffer, buffer_length, "%d", errno);
+}
+
 void os_socket_close(os_socket sock, Close_Mode mode)
 {
 	shutdown((int)mode);

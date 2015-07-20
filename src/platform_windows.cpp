@@ -16,7 +16,7 @@ os_timer_mark os_get_timer()
 float os_timer_delta_ms(os_timer_mark begin, os_timer_mark end)
 {
 	I64 diff = end.QuadPart - begin.QuadPart;
-	I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
+	I64 ticks = diff * 100000LL / os_windows_performance_counter_freq.QuadPart;
 	float ms = (float)ticks / 100.0f;
 	return ms;
 }
@@ -29,6 +29,12 @@ enum Close_Mode
 	Close_Write,
 	Close_ReadWrite,
 };
+
+void os_socket_format_last_error(char *buffer, U32 buffer_length)
+{
+	// TODO: Text errors for windows
+	_snprintf(buffer, buffer_length, "%d", WSAGetLastError());
+}
 
 void os_socket_close(os_socket sock, Close_Mode mode)
 {
@@ -91,7 +97,7 @@ inline void os_startup()
 	WSADATA wsadata;
 	WSAStartup(0x0202, &wsadata);
 
-	QueryPefrormanceFrequency(&os_windows_performance_counter_freq);
+	QueryPerformanceFrequency(&os_windows_performance_counter_freq);
 }
 
 inline void os_cleanup()
