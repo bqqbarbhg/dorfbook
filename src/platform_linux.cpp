@@ -6,17 +6,23 @@
 #include <netinet/in.h>
 #include <pthread.h>
 
+typedef timespec os_timer_mark;
+
+os_timer_mark os_get_timer()
+{
+	timespec value;
+	clock_gettime(CLOCK_MONOTONIC, &value);
+	return value;
+}
+
+float os_timer_delta_ms(os_timer_mark begin, os_timer_mark end)
+{
+	time_t sec_diff = end.seconds - begin.seconds;
+	int nano_diff = end.nanoseconds - begin.nanoseconds;
+	float ms = sec_diff * 1000.0f + nano_diff / 1000000.0f;
+}
+
 typedef int os_socket;
-
-inline void os_net_startup()
-{
-	// Not needed on linux.
-}
-
-inline void os_net_cleanup()
-{
-	// Not needed on linux.
-}
 
 enum Close_Mode
 {
@@ -76,3 +82,10 @@ inline os_thread os_thread_do(os_thread_func func, void *param)
 	return result;
 }
 
+inline void os_startup()
+{
+}
+
+inline void os_cleanup()
+{
+}

@@ -3,18 +3,25 @@
 #include <ws2tcpip.h>
 #include <Windows.h>
 
+typedef LARGE_INTEGER os_timer_mark;
+LARGE_INTEGER os_windows_performance_counter_freq;
+
+os_timer_mark os_get_timer()
+{
+	LARGE_INTEGER value;
+	QueryPerformanceCounter(&value);
+	return value;
+}
+
+float os_timer_delta_ms(os_timer_mark begin, os_timer_mark end)
+{
+	I64 diff = end.QuadPart - begin.QuadPart;
+	I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
+	float ms = (float)ticks / 100.0f;
+	return ms;
+}
+
 typedef SOCKET os_socket;
-
-inline void os_net_startup()
-{
-	WSADATA wsadata;
-	WSAStartup(0x0202, &wsadata);
-}
-
-inline void os_net_cleanup()
-{
-	WSACleanup();
-}
 
 enum Close_Mode
 {
@@ -79,4 +86,15 @@ inline os_thread os_thread_do(os_thread_func func, void *param)
 	result.handle = CreateThread(NULL, NULL, func, param, NULL, &result.id);
 	return result;
 }
+inline void os_startup()
+{
+	WSADATA wsadata;
+	WSAStartup(0x0202, &wsadata);
 
+	QueryPefrormanceFrequency(&os_windows_performance_counter_freq);
+}
+
+inline void os_cleanup()
+{
+	WSACleanup();
+}

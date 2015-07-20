@@ -55,8 +55,7 @@ struct World_Instance
 
 void update_to_now(World_Instance *world_instance)
 {
-	LARGE_INTEGER begin, end;
-	QueryPerformanceCounter(&begin);
+	os_timer_mark begin = os_get_timer();
 
 	int count = 0;
 	time_t now = time(NULL);
@@ -65,11 +64,10 @@ void update_to_now(World_Instance *world_instance)
 		world_tick(world_instance->world);
 		world_instance->last_updated++;
 	}
-	QueryPerformanceCounter(&end);
-	I64 diff = end.QuadPart - begin.QuadPart;
-	I64 ticks = diff * 100000LL / performance_frequency.QuadPart;
-	float ms = (float)ticks / 100.0f;
 
+	os_timer_mark end = os_get_timer();
+
+	float ms = os_timer_delta_ms(begin, end);
 	if (count > 0)
 		printf("Updated world %d ticks: Took %.2fms\n", count, ms);
 }
@@ -430,8 +428,6 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 int main(int argc, char **argv)
 {
 	os_net_startup();
-
-	QueryPerformanceFrequency(&performance_frequency);
 
 	signal(SIGINT, handle_kill);
 
