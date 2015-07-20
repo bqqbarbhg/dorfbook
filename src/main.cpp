@@ -483,15 +483,15 @@ int main(int argc, char **argv)
 	for (U32 id = 1; id < 10; id++) {
 		char *name = name_ptr;
 		name_ptr += 1 + sprintf(name_ptr, "%s %sson",
-			names[next32(world.random_series) % Count(names)],
-			names[next32(world.random_series) % Count(names)]);
+			names[next32(&world.random_series) % Count(names)],
+			names[next32(&world.random_series) % Count(names)]);
 
 		Dwarf *dwarf = &world.dwarves[id];
 		dwarf->id = id;
 		dwarf->location = 1;
 		dwarf->name = name;
-		dwarf->hunger = next32(world.random_series) % 50;
-		dwarf->sleep = next32(world.random_series) % 50;
+		dwarf->hunger = next32(&world.random_series) % 50;
+		dwarf->sleep = next32(&world.random_series) % 50;
 		dwarf->alive = true;
 		dwarf->seed = next32(&world.random_series);
 	}
