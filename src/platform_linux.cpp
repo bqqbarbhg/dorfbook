@@ -91,7 +91,10 @@ typedef void* (*os_thread_func)(void*);
 inline os_thread os_thread_do(os_thread_func func, void *param)
 {
 	os_thread result;
-	pthread_create(&result, 0, func, param);
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_create(&result, &attr, func, param);
 	return result;
 }
 
