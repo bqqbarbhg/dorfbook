@@ -24,13 +24,6 @@ float os_timer_delta_ms(os_timer_mark begin, os_timer_mark end)
 
 typedef SOCKET os_socket;
 
-enum Close_Mode
-{
-	Close_Read,
-	Close_Write,
-	Close_ReadWrite,
-};
-
 inline bool os_valid_socket(os_socket sock)
 {
 	return sock != INVALID_SOCKET;
@@ -42,9 +35,13 @@ void os_socket_format_last_error(char *buffer, U32 buffer_length)
 	_snprintf(buffer, buffer_length, "%d", WSAGetLastError());
 }
 
-void os_socket_close(os_socket sock, Close_Mode mode)
+void os_socket_stop_recv(os_socket sock)
 {
-	// TODO: Close modes for windows
+	// TODO: Stop socket receiving for windows
+}
+
+void os_socket_close(os_socket sock)
+{
 	closesocket(sock);
 }
 

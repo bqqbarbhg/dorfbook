@@ -25,13 +25,6 @@ float os_timer_delta_ms(os_timer_mark begin, os_timer_mark end)
 
 typedef int os_socket;
 
-enum Close_Mode
-{
-	Close_Read = SHUT_RD,
-	Close_Write = SHUT_WR,
-	Close_ReadWrite = SHUT_RDWR,
-};
-
 inline bool os_valid_socket(os_socket sock)
 {
 	return sock != -1;
@@ -43,9 +36,14 @@ void os_socket_format_last_error(char *buffer, U32 buffer_length)
 	snprintf(buffer, buffer_length, "%d", errno);
 }
 
-void os_socket_close(os_socket sock, Close_Mode mode)
+void os_socket_stop_recv(os_socket sock)
 {
-	shutdown(sock, (int)mode);
+	shutdown(sock, SHUT_RD);
+}
+
+void os_socket_close(os_socket sock)
+{
+	close(sock);
 }
 
 typedef pthread_mutex_t os_mutex;

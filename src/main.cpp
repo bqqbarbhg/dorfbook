@@ -39,7 +39,7 @@ void handle_kill(int signal)
 {
 	puts("server is kill");
 
-	os_socket_close(server_socket, Close_ReadWrite);
+	os_socket_close(server_socket);
 	
 	exit(0);
 }
@@ -412,9 +412,10 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 		}
 	}
 
-	buffer_free(&buffer);
-	os_socket_close(client_socket, Close_Read);
+	os_socket_stop_recv(client_socket);
+	os_socket_close(client_socket);
 
+	buffer_free(&buffer);
 	free(body);
 	free(thread_data);
 
