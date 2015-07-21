@@ -1,6 +1,7 @@
 
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -49,6 +50,23 @@ void os_socket_close(os_socket sock)
 int os_socket_send(os_socket sock, const char *data, int length)
 {
 	return send(sock, data, length, MSG_NOSIGNAL);
+}
+
+bool os_socket_set_timeout(os_socket sock, int recv_sec, int send_sec)
+{
+	timeval recv_time;
+	recv_time.tv_sec = recv_sec;
+	recv_time.tv_usec = 0;
+	timeval send_time;
+	send_time.tv_sec = send_sec;
+	send_time.tv_usec = 0;
+
+	unsigned fail = 0;
+	fail |= (unsigned)setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO,
+		(const char*)&recv_time, sizeof(recv_time));
+	fail |= (unsigned)setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
+		(const char*)&send_time, sizeof(send_time));
+	return fail == 0;
 }
 
 typedef pthread_mutex_t os_mutex;

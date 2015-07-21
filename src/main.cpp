@@ -515,12 +515,13 @@ int main(int argc, char **argv)
 		if (!os_valid_socket(client_socket))
 			continue;
 
-		int timeout = 15 * 1000; // 15 seconds
-		int err;
-		if (err = setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout)))
-			printf("Failed to set send timeout: %d\n", err);
-		if (err = setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)))
-			printf("Failed to set recv timeout: %d\n", err);
+		// Don't block on any function for longer than 15 seconds.
+		int timeout = 15;
+		if (!os_socket_set_timeout(client_socket, timeout, timeout)) {
+			os_socket_format_last_error(err_buffer, sizeof(err_buffer));
+			printf("Failed to set socket timeout: %s\n", err_buffer);
+			continue;
+		}
 
 		Response_Thread_Data *thread_data = (Response_Thread_Data*)malloc(sizeof(Response_Thread_Data));
 		thread_data->client_socket = client_socket;
