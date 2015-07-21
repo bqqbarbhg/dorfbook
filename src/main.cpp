@@ -93,7 +93,7 @@ OS_THREAD_ENTRY(thread_background_stat_update, server_stats)
 		stats->snapshot_index = (stats->snapshot_index + 1) % stats->snapshot_count;
 		os_mutex_unlock(&stats->lock);
 
-		os_sleep_seconds(1000);
+		os_sleep_seconds(1);
 	}
 }
 
