@@ -50,6 +50,21 @@ int os_socket_send(os_socket sock, const char *data, int length)
 	return send(sock, data, length, 0);
 }
 
+bool os_socket_set_delayed(os_socket sock, bool delayed) {
+	BOOL flag = delayed ? FALSE : TRUE;
+	return setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+		(const char*)&flag, sizeof(flag)) == 0;
+}
+
+int os_socket_send_and_flush(os_socket sock, const char *data, int length)
+{
+	bool set = os_socket_set_delayed(sock, false);
+	int ret = os_socket_send(sock, data, length);
+	if (set) os_socket_set_delayed(sock, true);
+
+	return ret;
+}
+
 bool os_socket_set_timeout(os_socket sock, int recv_sec, int send_sec)
 {
 	DWORD recv_time = recv_sec * 1000;
