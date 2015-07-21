@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <errno.h>
+#include <netinet/tcp.h>
 
 typedef timespec os_timer_mark;
 
@@ -50,6 +51,21 @@ void os_socket_close(os_socket sock)
 int os_socket_send(os_socket sock, const char *data, int length)
 {
 	return send(sock, data, length, MSG_NOSIGNAL);
+}
+
+bool os_socket_set_delayed(os_socket sock, bool delayed) {
+	int flag = delayed ? 0 : 1;
+	return setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+		(char*)&flag, sizeof(int)) == 0;
+}
+
+int os_socket_send_and_flush(os_socket sock, const char *data, int length)
+{
+	bool set = os_socket_set_delayed(sock, false);
+	int ret = os_socket_send(sock, data, length);
+	if (set) os_socket_set_delayed(sock, true);
+
+	return ret;
 }
 
 bool os_socket_set_timeout(os_socket sock, int recv_sec, int send_sec)

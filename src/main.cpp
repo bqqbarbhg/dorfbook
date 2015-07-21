@@ -43,7 +43,7 @@ void handle_kill(int signal)
 	puts("server is kill");
 
 	os_socket_close(server_socket);
-	
+
 	exit(0);
 }
 
@@ -284,7 +284,7 @@ void send_response(os_socket socket, const char *content_type, int status,
 	os_socket_send(socket, content_length_header, (int)strlen(content_length_header));
 	os_socket_send(socket, content_type_header, (int)strlen(content_type_header));
 	os_socket_send(socket, separator, (int)strlen(separator));
-	os_socket_send(socket, body, (int)strlen(body));
+	os_socket_send_and_flush(socket, body, (int)strlen(body));
 }
 
 void send_text_response(os_socket socket, const char *content_type, int status,
@@ -353,7 +353,11 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 				char iconbuf[512];
 				int num = (int)fread(iconbuf, 1, sizeof(iconbuf), icon);
 
-				os_socket_send(client_socket, iconbuf, num);
+				if (feof(icon)) {
+					os_socket_send_and_flush(client_socket, iconbuf, num);
+				} else {
+					os_socket_send(client_socket, iconbuf, num);
+				}
 			}
 
 			fclose(icon);
