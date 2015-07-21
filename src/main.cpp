@@ -313,12 +313,13 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 		if (buffer_read_line(&buffer, line, sizeof(line)) < 0)
 			break;
 
+		os_timer_mark begin_respond = os_get_timer();
+
 		char method[64];
 		char path[128];
 		char http_version[32];
 		sscanf(line, "%s %s %s\r\n", method, path, http_version);
 
-		printf("%d: Request to path %s %s\n", data->thread_id, method, path);
 
 		bool failed = false;
 		while (strlen(line)) {
@@ -424,6 +425,9 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
 			send_text_response(client_socket, "text/html", 200, body);
 		}
+
+		float ms = os_timer_delta_ms(begin_respond, os_get_timer());
+		printf("%d: Request %s %s (took %.2f ms)\n", data->thread_id, method, path, ms);
 	}
 
 	os_socket_stop_recv(client_socket);
