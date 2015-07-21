@@ -5,6 +5,9 @@
 
 #define DORF_PORT "3500"
 
+#define KB(amount) ((amount) * 1024)
+#define MB(amount) (KB(amount) * 1024)
+
 os_socket server_socket;
 os_atomic_uint32 active_thread_count;
 
@@ -156,6 +159,7 @@ struct Socket_Buffer
 	int data_size;
 	int pos;
 	int size;
+	int limit_left;
 };
 
 struct Read_Block
@@ -173,6 +177,11 @@ Socket_Buffer buffer_new(os_socket socket, int size=1024)
 	return buffer;
 }
 
+void buffer_limit(Socket_Buffer *buffer, int bytes)
+{
+	buffer->limit_left = bytes;
+}
+
 // NOTE: Does not free the socket
 void buffer_free(Socket_Buffer *buffer)
 {
@@ -181,7 +190,12 @@ void buffer_free(Socket_Buffer *buffer)
 
 bool buffer_fill_read(Socket_Buffer *buffer)
 {
-	int bytes_read = recv(buffer->socket, buffer->data, buffer->data_size, 0);
+	int to_read = min(buffer->data_size, buffer->limit_left);
+	if (to_read <= 0)
+		return false;
+
+	int bytes_read = recv(buffer->socket, buffer->data, to_read, 0);
+	buffer->limit_left -= to_read;
 	buffer->size = bytes_read;
 	buffer->pos = 0;
 	return bytes_read > 0;
@@ -291,6 +305,9 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 	Socket_Buffer buffer = buffer_new(client_socket);
 
 	for (;;) {
+
+		// Allow only 8kB of request line and headers, but reset on every request
+		buffer_limit(&buffer, KB(8));
 
 		char line[256];
 		if (buffer_read_line(&buffer, line, sizeof(line)) < 0)
