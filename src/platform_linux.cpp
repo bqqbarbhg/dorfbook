@@ -56,7 +56,7 @@ int os_socket_send(os_socket sock, const char *data, int length)
 bool os_socket_set_delayed(os_socket sock, bool delayed) {
 	int flag = delayed ? 0 : 1;
 	return setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
-		(char*)&flag, sizeof(int)) == 0;
+		(const char*)&flag, sizeof(flag)) == 0;
 }
 
 int os_socket_send_and_flush(os_socket sock, const char *data, int length)
