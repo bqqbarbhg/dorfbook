@@ -15,6 +15,9 @@ typedef uint64_t U64;
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
+#define KB(amount) ((amount) * 1024)
+#define MB(amount) (KB(amount) * 1024)
+
 #ifndef UINT32_MAX
 #define UINT32_MAX 0xFFFFFFFF
 #endif

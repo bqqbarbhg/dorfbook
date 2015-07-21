@@ -5,9 +5,6 @@
 
 #define DORF_PORT "3500"
 
-#define KB(amount) ((amount) * 1024)
-#define MB(amount) (KB(amount) * 1024)
-
 os_socket server_socket;
 os_atomic_uint32 active_thread_count;
 
