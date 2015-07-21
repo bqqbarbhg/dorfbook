@@ -231,24 +231,21 @@ int buffer_read_line(Socket_Buffer *buffer, char *line, int length)
 		if (!buffer_peek(buffer, &block, length - pos)) return -3;
 
 		char *end = (char*)memchr(block.data, '\r', block.length);
+		int in_length = end ? (int)(end - block.data) : block.length;
+
+		// Check for buffer overflow and null-byte injection
+		if (in_length > length - pos - 1) return -1;
+		if (memchr(block.data, '\0', in_length)) return -4;
+
+		// Copy until block end or \r
+		memcpy(line + pos, block.data, in_length);
+		buffer->pos += in_length;
+		pos += in_length;
+
 		if (end) {
-			int in_length = (int)(end - block.data);
-			if (in_length > length - pos - 1) return -1;
-
-			memcpy(line + pos, block.data, in_length);
-			pos += in_length;
-
-			buffer->pos += in_length;
 			if (!buffer_accept(buffer, "\r\n", 2)) return -2;
 			line[pos] = '\0';
-
 			return pos;
-		} else {
-			if (block.length > length - pos - 1) return -1;
-			
-			memcpy(line + pos, block.data, block.length);
-			buffer->pos += block.length;
-			pos += block.length;
 		}
 	}
 
