@@ -97,6 +97,7 @@ inline os_thread os_thread_do(os_thread_func func, void *param)
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_attr_setstacksize(&attr, 1024*1024);
 	pthread_create(&result, &attr, func, param);
 	return result;
 }
