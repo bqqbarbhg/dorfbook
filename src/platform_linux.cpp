@@ -46,6 +46,11 @@ void os_socket_close(os_socket sock)
 	close(sock);
 }
 
+int os_socket_send(os_socket sock, const char *data, int length)
+{
+	return send(sock, data, length, MSG_NOSIGNAL);
+}
+
 typedef pthread_mutex_t os_mutex;
 
 inline void os_mutex_init(os_mutex *mutex)

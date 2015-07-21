@@ -269,11 +269,11 @@ void send_response(os_socket socket, const char *content_type, int status,
 	sprintf(content_type_header, "Content-Type: %s\r\n", content_type);
 	const char *separator = "\r\n";
 
-	send(socket, response_start, (int)strlen(response_start), 0);
-	send(socket, content_length_header, (int)strlen(content_length_header), 0);
-	send(socket, content_type_header, (int)strlen(content_type_header), 0);
-	send(socket, separator, (int)strlen(separator), 0);
-	send(socket, body, (int)strlen(body), 0);
+	os_socket_send(socket, response_start, (int)strlen(response_start));
+	os_socket_send(socket, content_length_header, (int)strlen(content_length_header));
+	os_socket_send(socket, content_type_header, (int)strlen(content_type_header));
+	os_socket_send(socket, separator, (int)strlen(separator));
+	os_socket_send(socket, body, (int)strlen(body));
 }
 
 void send_text_response(os_socket socket, const char *content_type, int status,
@@ -329,16 +329,16 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 			const char *content_type = "Content-Type: image/x-icon\r\n";
 			const char *separator = "\r\n";
 
-			send(client_socket, response_start, (int)strlen(response_start), 0);
-			send(client_socket, content_length, (int)strlen(content_length), 0);
-			send(client_socket, content_type, (int)strlen(content_type), 0);
-			send(client_socket, separator, (int)strlen(separator), 0);
+			os_socket_send(client_socket, response_start, (int)strlen(response_start));
+			os_socket_send(client_socket, content_length, (int)strlen(content_length));
+			os_socket_send(client_socket, content_type, (int)strlen(content_type));
+			os_socket_send(client_socket, separator, (int)strlen(separator));
 
 			while (!feof(icon)) {
 				char iconbuf[512];
 				int num = (int)fread(iconbuf, 1, sizeof(iconbuf), icon);
 
-				send(client_socket, iconbuf, num, 0);
+				os_socket_send(client_socket, iconbuf, num);
 			}
 
 			fclose(icon);
