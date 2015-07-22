@@ -17,11 +17,20 @@ version.
 Otherwise just running `build.bat` and starting `bin/dorfbook.exe` should
 start the server.
 
+### Linux
+
+Currently only tested on Raspbian, but it should work fairly well with other
+distros too, since it's not using anything too advanced.
+
+Uses GCC for now, but could probably be switched to any C++ compiler which can
+compile a single C++ file.
+
+Running `build.sh` and starting `bin/dorfbook` should start the server.
+
 ### Other platforms
 
-Currently `main.cpp` is the only Windows-specific file, it should be split
-into a general HTTP serving and the platform parts.
-
-After that just building build.cpp with the compiler of your choice should do
-the trick.
+To add more platforms you need to create a `platform_$.cpp` file and include it
+with a conditional check for that platform in `build.cpp`. Other code should be
+platform independent so implementing the platform API and building `build.cpp`
+with a C++ compiler of your choice should work.
 
