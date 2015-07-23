@@ -1,6 +1,8 @@
 Dorfbook
 ========
 
+[![Build Status](https://travis-ci.org/bqqbarbhg/dorfbook.svg?branch=master)](https://travis-ci.org/bqqbarbhg/dorfbook)
+
 Virtual social media for following dwarven mischief.
 
 Will be up at [http://dorfbook.com](http://dorfbook.com) later.
