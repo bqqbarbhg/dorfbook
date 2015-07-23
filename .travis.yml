@@ -1,11 +1,8 @@
 language: c++
-compiler:
-  - gcc
-  - clang
 install:
   - sudo pip install requests
 script:
-  - make
+  - ./build.sh
   - bin/dorfbook > /dev/null &
   - test/test_routes.py
 sudo: required
