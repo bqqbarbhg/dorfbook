@@ -6,11 +6,5 @@ script:
   - ./build.sh
   - ./test.py
 after_script:
-  - echo Test stdout log
-  - echo ---------------
   - cat bin/test_out.log
-  - echo
-  - echo Test stderr log
-  - echo ---------------
   - cat bin/test_err.log
-  - echo
