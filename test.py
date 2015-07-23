@@ -8,16 +8,17 @@ from glob import glob
 import subprocess
 import signal
 
-binary_names = ['bin/dorfbook.exe', 'bin/dorfbook']
-binary = next((n for n in binary_names if os.path.isfile(n)), None)
-
-if not binary:
-	print 'Could not find dorfbook binary'
-	sys.exit(-1)
-
 def flush_write(text):
 	sys.stdout.write(text)
 	sys.stdout.flush()
+
+
+# Search for the correct binary name
+binary_names = ['bin/dorfbook.exe', 'bin/dorfbook']
+binary = next((n for n in binary_names if os.path.isfile(n)), None)
+if not binary:
+	print 'Could not find dorfbook binary'
+	sys.exit(-1)
 
 print 'Starting server'
 
@@ -41,6 +42,8 @@ else:
 
 flush_write('\n')
 
+# The mini testing framework
+
 Fail = namedtuple("Fail", ("filename", "line", "message"))
 def format_fail(fail):
 	loc = '%s:%d' % (fail.filename, fail.line)
@@ -52,19 +55,21 @@ class Tester:
 		self.num_total = 0
 
 	def check(self, condition, message):
+		self.num_total += 1
+
 		if not condition:
 			frame = sys._getframe(1)
 			filename = frame.f_code.co_filename
 			line = frame.f_lineno
-
 			fail = Fail(filename, line, message)
+
 			self.fail_list.append(fail)
-		self.num_total += 1
+
 		flush_write('.' if condition else 'F')
-		sys.stdout.flush()
 
 t = Tester()
 
+# Run all the python files under test/
 for testfile in glob('test/*.py'):
 	flush_write('Running %s: ' % testfile)
 	execfile(testfile)
@@ -76,6 +81,8 @@ print 'Closing server'
 server.terminate()
 
 flush_write('\n')
+
+# Print the test results
 
 print 'Tests passed: %d/%d' % (t.num_total - len(t.fail_list), t.num_total)
 if t.fail_list:
