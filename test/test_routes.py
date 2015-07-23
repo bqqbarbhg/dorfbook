@@ -32,7 +32,7 @@ t.check(r.status_code == 200, 'Can get root')
 r = requests.get('http://127.0.0.1:3500/sdoijfiosdjf')
 t.check(r.status_code == 404, 'Random route gives 404')
 
-print '%d tests %d passed' % (t.num_total, t.num_total - len(t.fail_list))
+print 'Tests passed: %d/%d' % (t.num_total - len(t.fail_list), t.num_total)
 if t.fail_list:
 	print 'Failed tests:'
 	print '\n'.join('%s' % format_fail(fail) for fail in t.fail_list)
