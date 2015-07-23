@@ -36,3 +36,30 @@ with a conditional check for that platform in `build.cpp`. Other code should be
 platform independent so implementing the platform API and building `build.cpp`
 with a C++ compiler of your choice should work.
 
+Testing
+-------
+
+### Requirements
+
+Python 2.x is required to run the tests. It should be included in most operating
+systems except windows. To install on Windows you can download it at
+https://www.python.org/downloads/
+
+Also the following Python libraries are required:
+- [requests](https://pypi.python.org/pypi/requests)
+
+The easiest way to install the depended libraries is to use pip. It is
+included in newer Python versions, but if you have an older version follow the
+instructions at
+https://pip.pypa.io/en/latest/installing.html
+
+With pip run the following to install the dependencies:
+```
+pip install -r test/python_requirements.txt
+```
+
+### Running
+
+To run the test simply run the `test.py` file. It starts the server temporarily
+and runs all the `.py` files under the `test/` folder.
+
