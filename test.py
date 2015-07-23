@@ -10,6 +10,10 @@ def format_fail(fail):
 	loc = '%s:%d' % (fail.filename, fail.line)
 	return '%30s  %s' % (loc, fail.message)
 
+def flush_write(text):
+	sys.stdout.write(text)
+	sys.stdout.flush()
+
 class Tester:
 	def __init__(self):
 		self.fail_list = []
@@ -24,14 +28,15 @@ class Tester:
 			fail = Fail(filename, line, message)
 			self.fail_list.append(fail)
 		self.num_total += 1
-		sys.stdout.write('.' if condition else 'F', flush=True)
+		flush_write('.' if condition else 'F')
+		sys.stdout.flush()
 
 t = Tester()
 
 for testfile in glob('test/*.py'):
-	sys.stdout.write('Running %s: ' % testfile, flush=True)
+	flush_write('Running %s: ' % testfile)
 	execfile(testfile)
-	sys.stdout.write('\n', flush=True)
+	flush_write('\n')
 
 print 'Tests passed: %d/%d' % (t.num_total - len(t.fail_list), t.num_total)
 if t.fail_list:
