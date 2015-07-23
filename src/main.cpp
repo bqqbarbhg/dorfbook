@@ -438,7 +438,7 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 			os_mutex_unlock(&world_instance->lock);
 
 			send_text_response(client_socket, "text/html", status, body);
-		
+
 			// TODO: Seriously need a real routing scheme
 		} else if (sscanf(path, "/entities/%d", &id) == 1 && strstr(path, "avatar.svg")) {
 

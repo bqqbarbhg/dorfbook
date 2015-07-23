@@ -44,7 +44,7 @@ uint32_t crc32(const void* data, size_t length)
 			}
 		}
 	}
-	
+
 	// Invert again (per gzip standard)
 	return ~crc;
 }

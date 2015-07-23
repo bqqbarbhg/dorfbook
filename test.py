@@ -44,24 +44,27 @@ flush_write('\n')
 
 # The mini testing framework
 
-Fail = namedtuple("Fail", ("filename", "line", "message"))
+Fail = namedtuple("Fail", ("filename", "line", "description", "extra"))
 def format_fail(fail):
 	loc = '%s:%d' % (fail.filename, fail.line)
-	return '%30s  %s' % (loc, fail.message)
+	line = '%30s  %s' % (loc, fail.description)
+	if fail.extra:
+		line += '  (%s)' % fail.extra
+	return line
 
 class Tester:
 	def __init__(self):
 		self.fail_list = []
 		self.num_total = 0
 
-	def check(self, condition, message):
+	def check(self, condition, description, extra=None):
 		self.num_total += 1
 
 		if not condition:
 			frame = sys._getframe(1)
 			filename = frame.f_code.co_filename
 			line = frame.f_lineno
-			fail = Fail(filename, line, message)
+			fail = Fail(filename, line, description, extra)
 
 			self.fail_list.append(fail)
 

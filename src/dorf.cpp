@@ -97,7 +97,7 @@ void world_tick(World *world)
 
 		dwarf->hunger++;
 		dwarf->sleep++;
-		
+
 		switch (dwarf->activity) {
 
 		case Activity_Idle:
@@ -198,7 +198,7 @@ int render_feed(World *world, char *buffer)
 			continue;
 
 		ptr += sprintf(ptr, "<li><a href=\"/entities/%d\">%s</a>:", dwarf->id, dwarf->name);
-		
+
 		switch (post->type) {
 
 		case Post_Activity:
@@ -234,14 +234,14 @@ int render_entity(World *world, U32 id, char *buffer)
 	}
 
 	ptr += sprintf(ptr, "<html><head><title>%s</title></head>", dwarf->name);
-	ptr += sprintf(ptr, "<body><h1>%s</h1>", dwarf->name); 
+	ptr += sprintf(ptr, "<body><h1>%s</h1>", dwarf->name);
 	ptr += sprintf(ptr, "<img src=\"/entities/%d/avatar.svg\""
-		"width=\"200\" height=\"200\">", dwarf->id); 
+		"width=\"200\" height=\"200\">", dwarf->id);
 	Location* location = &world->locations[dwarf->location];
 	ptr += sprintf(ptr, "<h2>%s in <a href=\"/locations/%d\">%s</a></h2>",
-		dwarf_status(dwarf), location->id, location->name); 
-	ptr += sprintf(ptr, "<h3>Hunger: %d, sleep: %d</h3>", dwarf->hunger, dwarf->sleep); 
-	ptr += sprintf(ptr, "</body></html>"); 
+		dwarf_status(dwarf), location->id, location->name);
+	ptr += sprintf(ptr, "<h3>Hunger: %d, sleep: %d</h3>", dwarf->hunger, dwarf->sleep);
+	ptr += sprintf(ptr, "</body></html>");
 
 	return 200;
 }
@@ -265,8 +265,8 @@ int render_entity_avatar(World *world, U32 id, char *buffer)
 	ptr += sprintf(ptr, "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\""
 		" width=\"100\" height=\"100\">\n");
 	ptr += sprintf(ptr, "<circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"#%06x\" />\n",
-			dwarf->seed & 0xFFFFFF); 
-	ptr += sprintf(ptr, "</svg>\n"); 
+			dwarf->seed & 0xFFFFFF);
+	ptr += sprintf(ptr, "</svg>\n");
 
 	return 200;
 }
