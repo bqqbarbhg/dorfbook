@@ -181,7 +181,7 @@ int render_stats(Server_Stats *stats, char *body)
 		ptr += sprintf(ptr, "<path d=\"M30 %f L400 %f\" stroke=\"#ddd\" stroke-width=\"1\""
 			" fill=\"none\" />\n", y, y);
 		ptr += sprintf(ptr, "<text x=\"25\" y=\"%f\" text-anchor=\"end\" "
-			"fill=\"gray\">%d</text>", y + 4.0f, value);
+			"fill=\"gray\">%d</text>", y + 4.0f, (int)value);
 	}
 
 	ptr += sprintf(ptr, "<path d=\"");
@@ -334,7 +334,7 @@ void send_response(os_socket socket, const char *content_type, int status,
 	sprintf(response_start, "HTTP/1.1 %d %s\r\n", status, status_desc);
 
 	char content_length_header[128];
-	sprintf(content_length_header, "Content-Length: %d\r\n", body_length);
+	sprintf(content_length_header, "Content-Length: %d\r\n", (int)body_length);
 	char content_type_header[128];
 	sprintf(content_type_header, "Content-Type: %s\r\n", content_type);
 	const char *separator = "\r\n";
