@@ -2,22 +2,40 @@
 
 import sys
 import requests
+from collections import namedtuple
 
-fail_list = []
-num_total = 0
+Fail = namedtuple("Fail", ("filename", "line", "message"))
+def format_fail(fail):
+	loc = '%s:%d' % (fail.filename, fail.line)
+	return '%30s  %s' % (loc, fail.message)
 
-def test_assert(x, msg):
-	if not x:
-		fail_list.append(msg)
-	num_total += 1
+class Tester:
+	def __init__(self):
+		self.fail_list = []
+		self.num_total = 0
 
-r = requests.get('http://localhost:3500/')
-test_assert(r.status_code == 200, 'Can get root')
+	def check(self, condition, message):
+		if not condition:
+			frame = sys._getframe(1)
+			filename = frame.f_code.co_filename
+			line = frame.f_lineno
 
-r = requests.get('http://localhost:3500/sdoijfiosdjf')
-test_assert(r.status_code == 404, 'Random route gives 404')
+			fail = Fail(filename, line, message)
+			self.fail_list.append(fail)
+		self.num_total += 1
 
-print '%d tests %d passed' % (num_total, len(fail_list))
-print '\n'.join('Fail: %s' % fail for fail in fail_list)
-sys.exit(len(fail_list))
+t = Tester()
+
+r = requests.get('http://127.0.0.1:3500/')
+t.check(r.status_code == 200, 'Can get root')
+
+r = requests.get('http://127.0.0.1:3500/sdoijfiosdjf')
+t.check(r.status_code == 404, 'Random route gives 404')
+
+print '%d tests %d passed' % (t.num_total, t.num_total - len(t.fail_list))
+if t.fail_list:
+	print 'Failed tests:'
+	print '\n'.join('%s' % format_fail(fail) for fail in t.fail_list)
+
+sys.exit(len(t.fail_list))
 
