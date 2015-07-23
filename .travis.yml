@@ -4,5 +4,4 @@ install:
   - pip install requests --user `whoami`
 script:
   - ./build.sh
-  - bin/dorfbook > /dev/null &
   - ./test.py

@@ -515,6 +515,7 @@ int main(int argc, char **argv)
 	static char err_buffer[128];
 
 	signal(SIGINT, handle_kill);
+	signal(SIGTERM, handle_kill);
 
 	global_stats.snapshot_count = 100;
 	global_stats.active_thread_counts = (long*)calloc(global_stats.snapshot_count, sizeof(long));
