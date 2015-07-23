@@ -3,7 +3,8 @@ compiler:
   - gcc
   - clang
 install:
-  - pip install requests
+  - sudo pip install requests
 script:
   - make
   - test/test_routes.py
+sudo: required
