@@ -4,5 +4,5 @@ install:
 script:
   - ./build.sh
   - bin/dorfbook > /dev/null &
-  - test/test_routes.py
+  - ./test.py
 sudo: required
