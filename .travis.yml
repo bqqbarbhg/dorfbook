@@ -1,8 +1,8 @@
 language: c++
 install:
-  - sudo pip install requests
+  - export PATH=$HOME/.local/bin:$PATH
+  - sudo pip install requests --user `whoami`
 script:
   - ./build.sh
   - bin/dorfbook > /dev/null &
   - ./test.py
-sudo: required
