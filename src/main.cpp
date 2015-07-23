@@ -484,9 +484,12 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 
 			send_text_response(client_socket, "text/html", status, body);
 
-		}  else {
+		} else if (!strcmp(path, "/")) {
 			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
 			send_text_response(client_socket, "text/html", 200, body);
+		} else {
+			const char *body = "<html><body><h1>Not found.</h1></body></html>";
+			send_text_response(client_socket, "text/html", 404, body);
 		}
 
 		float ms = os_timer_delta_ms(begin_respond, os_get_timer());
