@@ -1,7 +1,7 @@
 language: c++
 install:
   - export PATH=$HOME/.local/bin:$PATH
-  - pip install requests --user `whoami`
+  - pip install -r test/python_requirements.txt --user `whoami`
 script:
   - ./build.sh
   - ./test.py
