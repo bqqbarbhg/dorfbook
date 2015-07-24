@@ -47,6 +47,7 @@ https://www.python.org/downloads/
 
 Also the following Python libraries are required:
 - [requests](https://pypi.python.org/pypi/requests)
+- [BeautifulSoup](https://pypi.python.org/pypi/beautifulsoup4)
 
 The easiest way to install the depended libraries is to use pip. It is
 included in newer Python versions, but if you have an older version follow the

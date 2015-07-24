@@ -1,6 +1,4 @@
 
-def dorf_get(route):
-	return requests.get('http://127.0.0.1:3500' + route)
 
 expect_routes = ['/', '/dwarves', '/locations', '/feed', '/stats']
 for route in expect_routes:

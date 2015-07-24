@@ -7,11 +7,14 @@ from collections import namedtuple
 from glob import glob
 import subprocess
 import signal
+from bs4 import BeautifulSoup
 
 def flush_write(text):
 	sys.stdout.write(text)
 	sys.stdout.flush()
 
+def dorf_get(route):
+	return requests.get('http://127.0.0.1:3500' + route)
 
 # Search for the correct binary name
 binary_names = ['bin/dorfbook.exe', 'bin/dorfbook']
@@ -69,6 +72,7 @@ class Tester:
 			self.fail_list.append(fail)
 
 		flush_write('.' if condition else 'F')
+		return condition
 
 t = Tester()
 
