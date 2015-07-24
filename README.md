@@ -42,7 +42,7 @@ Testing
 ### Requirements
 
 Python 2.x is required to run the tests. It should be included in most operating
-systems except windows. To install on Windows you can download it at
+systems except Windows. To install on Windows you can download it at
 https://www.python.org/downloads/
 
 Also the following Python libraries are required:
