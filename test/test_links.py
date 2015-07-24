@@ -1,7 +1,7 @@
 
 from xml.etree import ElementTree as XmlTree
 
-to_crawl = {'/', '/dwarves', '/locations', '/feed', '/stats'}
+to_crawl = {'/', '/favicon.ico', '/dwarves', '/locations', '/feed', '/stats'}
 crawled = set()
 got_from = { url: '(root)' for url in to_crawl }
 while len(to_crawl) > len(crawled):
