@@ -2,3 +2,6 @@
 # Build output files
 bin/*
 
+# Pre-build output files
+gen/*
+

@@ -7,6 +7,7 @@
 #include "platform_linux.cpp"
 #endif
 
+#include "../gen/pre_output.cpp"
 #include "deflate.cpp"
 #include "random.cpp"
 #include "dorf.cpp"
