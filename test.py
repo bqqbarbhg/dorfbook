@@ -8,7 +8,7 @@ from glob import glob
 import subprocess
 import signal
 from bs4 import BeautifulSoup
-import random
+from StringIO import StringIO
 
 def flush_write(text):
 	sys.stdout.write(text)
