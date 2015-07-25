@@ -8,6 +8,7 @@ from glob import glob
 import subprocess
 import signal
 from bs4 import BeautifulSoup
+import random
 
 def flush_write(text):
 	sys.stdout.write(text)
@@ -22,6 +23,13 @@ binary = next((n for n in binary_names if os.path.isfile(n)), None)
 if not binary:
 	print 'Could not find dorfbook binary'
 	sys.exit(-1)
+
+def test_call(func, buf):
+	proc = subprocess.Popen([binary, '-t', func],
+		stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE)
+	com = proc.communicate(buf)
+	return com[0]
 
 print 'Starting server'
 

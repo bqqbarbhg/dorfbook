@@ -510,6 +510,12 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 
 int main(int argc, char **argv)
 {
+	// TODO: Real argument parsing
+	if (argc >= 3 && !strcmp(argv[1], "-t")) {
+		test_call(argv[2]);
+		return 0;
+	}
+
 	os_startup();
 
 	static char err_buffer[128];

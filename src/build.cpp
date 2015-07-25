@@ -10,5 +10,6 @@
 #include "deflate.cpp"
 #include "random.cpp"
 #include "dorf.cpp"
+#include "test_call.cpp"
 #include "main.cpp"
 
