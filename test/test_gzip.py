@@ -28,7 +28,7 @@ for _ in range(5):
 	except zlib.error as err:
 		extra = 'zlib: %s' % str(err.message)
 	except IOError as err:
-		extra = 'zlib: %s' % str(err.message)
+		extra = 'io: %s' % str(err.message)
 
 	t.check(success, "gzip round trips", extra)
 
