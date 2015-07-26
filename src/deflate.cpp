@@ -84,7 +84,7 @@ Memory_Match search_memory(const char *memory, size_t memory_len,
 	char begin = match[0];
 
 	for (;;) {
-		pos = memchr(pos, begin, memory_end - pos);
+		pos = (const char*)memchr(pos, begin, memory_end - pos);
 
 		if (!pos)
 			break;
@@ -97,7 +97,7 @@ Memory_Match search_memory(const char *memory, size_t memory_len,
 		}
 
 		size_t len = end - pos;
-		if (len > best_match.pos) {
+		if (len > best_match.length) {
 			best_match.pos = pos;
 			best_match.length = len;
 		}
@@ -108,37 +108,63 @@ Memory_Match search_memory(const char *memory, size_t memory_len,
 
 struct Bit_Ptr
 {
-	uint32_t *data;
+	uint8_t *data;
 	unsigned offset;
 };
 
 Bit_Ptr bit_ptr(void *data)
 {
 	Bit_Ptr ptr;
-	ptr.data = (uint32_t*)data;
+	ptr.data = (uint8_t*)data;
 	*ptr.data = 0;
 	ptr.offset = 0;
 	return ptr;
 }
 
-void bit_write(Bit_Ptr *ptr, uint32_t value, unsigned length)
+void bit_write_lsb(Bit_Ptr *ptr, uint32_t val, unsigned bits)
 {
-	int shift = length + ptr.offset - 32;
-	if (shift < 0)
-		ptr.data |= value << shift;
-	else
-		ptr.data |= value >> shift;
+	// Slow basic impl
 
-	ptr.shift += length;
-	if (ptr.offset >= 32) {
-		ptr.offset -= 32;
-		++ptr.data;
-		if (ptr.offset > 0) {
-			*ptr.data = value << (32 - ptr.offset);
-		} else {
-			*ptr.data = 0;
+	uint32_t mask = 1 << bits;
+	uint8_t out = *ptr->data;
+	unsigned offset = ptr->offset;
+
+	for (unsigned bit = 0; bit < bits; bit++) {
+		if (offset >= sizeof(*ptr->data) * 8) {
+			ptr->offset = offset = 0;
+			*ptr->data = out;
+			ptr->data++;
+			*ptr->data = out = 0;
 		}
+
+		out |= ((val >> bit) & 1) << offset;
+		offset++;
 	}
+	*ptr->data = out;
+	ptr->offset = offset;
+}
+
+void bit_write_msb(Bit_Ptr *ptr, uint32_t val, unsigned bits)
+{
+	// Slow basic impl
+
+	uint32_t mask = 1 << bits;
+	uint8_t out = *ptr->data;
+	unsigned offset = ptr->offset;
+
+	for (unsigned bit = 0; bit < bits; bit++) {
+		if (offset >= sizeof(*ptr->data) * 8) {
+			ptr->offset = offset = 0;
+			*ptr->data = out;
+			ptr->data++;
+			*ptr->data = out = 0;
+		}
+
+		out |= ((val >> (bits - bit - 1)) & 1) << offset;
+		offset++;
+	}
+	*ptr->data = out;
+	ptr->offset = offset;
 }
 
 size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
@@ -146,12 +172,23 @@ size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
 {
 	const char *in = (const char*)src;
 
-	Bit_Ptr out = { data, 0 };
+	Bit_Ptr out = bit_ptr(dst);
+
+	bit_write_lsb(&out, 5, 3);
 
 	for (size_t pos = 0; pos < src_length; pos++) {
 
-
+		char c = in[pos];
+		if (c < 144) {
+			bit_write_msb(&out, 0x30 + c, 8);
+		} else {
+			bit_write_msb(&out, 0x190 + (c - 144), 9);
+		}
 	}
+
+	bit_write_msb(&out, 0x0, 7);
+
+	return out.data - (uint8_t*)dst;
 }
 
 size_t gzip_no_compress(void *dst, size_t dst_length,
@@ -191,7 +228,7 @@ size_t gzip_no_compress(void *dst, size_t dst_length,
 	*out++ = 0xff;
 
 	// Append the DEFLATE compressed data.
-	size_t len = deflate_no_compress(out, dst_length - 1, src, src_length);
+	size_t len = deflate_compress_fixed_block(out, dst_length - 1, src, src_length);
 	if (len == 0)
 		return 0;
 
