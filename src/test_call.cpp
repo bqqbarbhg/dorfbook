@@ -25,28 +25,16 @@ Test_Def test_defs[] = {
 	"gzip", test_gzip,
 };
 
-void test_call(const char *name)
+size_t test_call(const char *name, char *out_buffer,
+	const char *in_buffer, size_t in_length)
 {
 	for (int i = 0; i < Count(test_defs); i++) {
 		if (strcmp(test_defs[i].name, name))
 			continue;
 
-		char *in_buffer = (char*)malloc(TEST_BUFFER_SIZE);
-		char *out_buffer = (char*)malloc(TEST_BUFFER_SIZE);
-
-		size_t amount = 0;
-		while (!feof(stdin)) {
-			size_t num = fread(&in_buffer[amount], 1, 1024, stdin);
-			amount += num;
-		}
-		size_t size = test_defs[i].func(out_buffer, in_buffer, amount);
-
-		fwrite(out_buffer, 1, size, stdout);
-
-		free(in_buffer);
-		free(out_buffer);
-
-		break;
+		size_t size = test_defs[i].func(out_buffer, in_buffer, in_length);
+		return size;
 	}
+	return 0;
 }
 

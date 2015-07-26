@@ -25,11 +25,8 @@ if not binary:
 	sys.exit(-1)
 
 def test_call(func, buf):
-	proc = subprocess.Popen([binary, '-t', func],
-		stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-		stderr=subprocess.PIPE)
-	com = proc.communicate(buf)
-	return com[0]
+	r = requests.post('http://127.0.0.1:3500/test/' + func, buf)
+	return r.content
 
 print 'Starting server'
 

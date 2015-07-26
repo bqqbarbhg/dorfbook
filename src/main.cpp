@@ -326,6 +326,19 @@ int buffer_read_line(Socket_Buffer *buffer, char *line, int length)
 	return -1;
 }
 
+int buffer_read_amount(Socket_Buffer *buffer, char *data, int length)
+{
+	int pos = 0;
+	Read_Block block;
+	while (length - pos > 0) {
+		if (!buffer_read(buffer, &block, length - pos))
+			return false;
+		memcpy(data + pos, block.data, block.length);
+		pos += block.length;
+	}
+	return true;
+}
+
 void send_response(os_socket socket, const char *content_type, int status,
 	const char *body, size_t body_length)
 {
@@ -343,7 +356,7 @@ void send_response(os_socket socket, const char *content_type, int status,
 	os_socket_send(socket, content_length_header, (int)strlen(content_length_header));
 	os_socket_send(socket, content_type_header, (int)strlen(content_type_header));
 	os_socket_send(socket, separator, (int)strlen(separator));
-	os_socket_send_and_flush(socket, body, (int)strlen(body));
+	os_socket_send_and_flush(socket, body, (int)body_length);
 }
 
 void send_text_response(os_socket socket, const char *content_type, int status,
@@ -379,6 +392,7 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 		char http_version[32];
 		sscanf(line, "%s %s %s\r\n", method, path, http_version);
 
+		unsigned int content_length = 0;
 
 		bool failed = false;
 		while (strlen(line)) {
@@ -386,11 +400,14 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 				failed = true;
 				break;
 			}
+			// TODO: Case-insensitive headers
+			sscanf(line, "Content-Length: %d", &content_length);
 		}
 		if (failed)
 			break;
 
 		U32 id;
+		char test_name[128];
 		if (!strcmp(path, "/favicon.ico")) {
 			FILE *icon = fopen("data/icon.ico", "rb");
 			fseek(icon, 0, SEEK_END);
@@ -484,6 +501,23 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 
 			send_text_response(client_socket, "text/html", status, body);
 
+		} else if (sscanf(path, "/test/%s", test_name) == 1) {
+
+			char *in_buffer = (char*)malloc(TEST_BUFFER_SIZE);
+			char *out_buffer = (char*)malloc(TEST_BUFFER_SIZE);
+
+			// TODO: This is bad.
+			buffer_read_amount(&buffer, in_buffer, content_length);
+
+			size_t out_length = test_call(test_name, out_buffer,
+				in_buffer, content_length);
+
+			send_response(client_socket, "application/octet-stream", 200,
+				out_buffer, out_length);
+
+			free(in_buffer);
+			free(out_buffer);
+
 		} else if (!strcmp(path, "/")) {
 			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
 			send_text_response(client_socket, "text/html", 200, body);
@@ -510,11 +544,6 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 
 int main(int argc, char **argv)
 {
-	// TODO: Real argument parsing
-	if (argc >= 3 && !strcmp(argv[1], "-t")) {
-		test_call(argv[2]);
-		return 0;
-	}
 
 	os_startup();
 
