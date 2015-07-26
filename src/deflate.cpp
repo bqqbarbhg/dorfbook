@@ -62,6 +62,98 @@ size_t deflate_no_compress(void *dst, size_t dst_length,
 	return out - out_start;
 }
 
+struct Memory_Match
+{
+	const char *pos;
+	size_t length;
+};
+
+Memory_Match search_memory(const char *memory, size_t memory_len,
+	const char *match, size_t match_len)
+{
+	Memory_Match best_match;
+	best_match.pos = 0;
+	best_match.length = 0;
+
+	if (memory_len == 0 || match_len == 0)
+		return best_match;
+
+	const char *memory_end = memory + memory_len;
+	const char *match_end = match + match_len;
+	const char *pos = memory;
+	char begin = match[0];
+
+	for (;;) {
+		pos = memchr(pos, begin, memory_end - pos);
+
+		if (!pos)
+			break;
+
+		const char *match_pos = match + 1;
+		const char *end = pos + 1;
+		for (; end < memory_end && match_pos < match_end; end++, match_pos++) {
+			if (*match_pos != *end)
+				break;
+		}
+
+		size_t len = end - pos;
+		if (len > best_match.pos) {
+			best_match.pos = pos;
+			best_match.length = len;
+		}
+	}
+
+	return best_match;
+}
+
+struct Bit_Ptr
+{
+	uint32_t *data;
+	unsigned offset;
+};
+
+Bit_Ptr bit_ptr(void *data)
+{
+	Bit_Ptr ptr;
+	ptr.data = (uint32_t*)data;
+	*ptr.data = 0;
+	ptr.offset = 0;
+	return ptr;
+}
+
+void bit_write(Bit_Ptr *ptr, uint32_t value, unsigned length)
+{
+	int shift = length + ptr.offset - 32;
+	if (shift < 0)
+		ptr.data |= value << shift;
+	else
+		ptr.data |= value >> shift;
+
+	ptr.shift += length;
+	if (ptr.offset >= 32) {
+		ptr.offset -= 32;
+		++ptr.data;
+		if (ptr.offset > 0) {
+			*ptr.data = value << (32 - ptr.offset);
+		} else {
+			*ptr.data = 0;
+		}
+	}
+}
+
+size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
+	const void *src, size_t src_length)
+{
+	const char *in = (const char*)src;
+
+	Bit_Ptr out = { data, 0 };
+
+	for (size_t pos = 0; pos < src_length; pos++) {
+
+
+	}
+}
+
 size_t gzip_no_compress(void *dst, size_t dst_length,
 		const void *src, size_t src_length)
 {
