@@ -39,7 +39,7 @@ fixtures = [
 	(bytearray([]), "Empty"),
 	(bytearray([0]), "Single zero"),
 	(bytearray(list(range(256))), "All sequential bytes"),
-	(bytearray([0xAB, 0xCD, 0xEF, 0x99] * 2000), "2000x ABCDEF99"),
+	(bytearray([0xAB, 0xCD, 0xEF, 0x99] * 1000), "2000x ABCDEF99"),
 ]
 
 # Wait for the server to respond
@@ -90,6 +90,9 @@ t = Tester()
 
 # Run all the python files under test/
 for testfile in glob('test/*.py'):
+	if len(sys.argv) > 1 and not any(t in testfile for t in sys.argv[1:]):
+		print 'Ignoring %s' % testfile
+		continue
 	flush_write('Running %s: ' % testfile)
 	execfile(testfile)
 	flush_write('\n')
