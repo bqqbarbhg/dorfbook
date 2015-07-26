@@ -35,6 +35,13 @@ test_out_log = open('bin/test_out.log', 'w')
 test_err_log = open('bin/test_err.log', 'w')
 server = subprocess.Popen([binary], stdout=test_out_log, stderr=test_err_log)
 
+fixtures = [
+	(bytearray([]), "Empty"),
+	(bytearray([0]), "Single zero"),
+	(bytearray(list(range(256))), "All sequential bytes"),
+	(bytearray([0xAB, 0xCD, 0xEF, 0x99] * 2000), "2000x ABCDEF99"),
+]
+
 # Wait for the server to respond
 for t in range(10):
 	try:

@@ -20,9 +20,16 @@ size_t test_gzip(char *out_buffer, const char* in_buffer, size_t length)
 	return gzip_no_compress(out_buffer, TEST_BUFFER_SIZE, in_buffer, length);
 }
 
+size_t test_identity(char *out_buffer, const char* in_buffer, size_t length)
+{
+	memcpy(out_buffer, in_buffer, length);
+	return length;
+}
+
 Test_Def test_defs[] = {
 	"crc32", test_crc32,
 	"gzip", test_gzip,
+	"identity", test_identity,
 };
 
 size_t test_call(const char *name, char *out_buffer,

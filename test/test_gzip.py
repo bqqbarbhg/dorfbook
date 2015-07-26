@@ -3,13 +3,6 @@ import random
 import zlib
 import gzip
 
-fixtures = [
-	(bytearray([]), "Empty"),
-	(bytearray([0]), "Single zero"),
-	(bytearray(list(range(256))), "All sequential bytes"),
-	(bytearray([0xAB, 0xCD, 0xEF, 0x99] * 2000), "2000x ABCDEF99"),
-]
-
 for data, desc in fixtures:
 
 	dorf_crc = int(test_call("crc32", data))
