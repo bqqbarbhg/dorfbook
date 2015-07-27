@@ -167,14 +167,20 @@ void bit_write_msb(Bit_Ptr *ptr, uint32_t val, unsigned bits)
 	ptr->offset = offset;
 }
 
+void* bit_finish(Bit_Ptr *ptr)
+{
+	return ptr->data + 1;
+}
+
 size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
 	const void *src, size_t src_length)
 {
 	const char *in = (const char*)src;
 
-	Bit_Ptr out = bit_ptr(dst);
+	uint8_t *out_start = (uint8_t*)dst;
+	Bit_Ptr out = bit_ptr(out_start);
 
-	bit_write_lsb(&out, 5, 3);
+	bit_write_lsb(&out, 3, 3);
 
 	for (size_t pos = 0; pos < src_length; pos++) {
 
@@ -188,7 +194,8 @@ size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
 
 	bit_write_msb(&out, 0x0, 7);
 
-	return out.data - (uint8_t*)dst;
+	uint8_t *out_end = (uint8_t*)bit_finish(&out);
+	return out_end - out_start;
 }
 
 size_t gzip_no_compress(void *dst, size_t dst_length,
