@@ -39,7 +39,7 @@ fixtures = [
 	(bytearray([]), "Empty"),
 	(bytearray([0]), "Single zero"),
 	(bytearray(list(range(256))), "All sequential bytes"),
-	(bytearray([0xAB, 0xCD, 0xEF, 0x99] * 1000), "2000x ABCDEF99"),
+	(bytearray([0xAB, 0xCD, 0xEF, 0x99] * 1000), "1000x ABCDEF99"),
 ]
 
 # Wait for the server to respond
