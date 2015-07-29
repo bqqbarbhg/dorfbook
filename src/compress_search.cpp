@@ -5,7 +5,7 @@
 // match for.
 //
 // The matching word "latch-math" is a material match.
-//                                                 ^
+//                                              ^
 //
 // Check the tuple of the next three characters [mat] and retrieve the chain.
 //
