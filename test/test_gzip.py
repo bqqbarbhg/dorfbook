@@ -3,7 +3,12 @@ import random
 import zlib
 import gzip
 
-for data, desc in fixtures:
+gzip_fixtures = fixtures + [
+	("simple simple", '"simple simple"'),
+	("<html><head><title>title</title></head></html>", "Html head"),
+]
+
+for data, desc in gzip_fixtures:
 
 	dorf_crc = int(test_call("crc32", data))
 	zlib_crc = zlib.crc32(str(data)) & 0xFFFFFFFF
@@ -11,7 +16,7 @@ for data, desc in fixtures:
 	t.check(dorf_crc == zlib_crc, "crc32 is compatible with zlib", desc)
 
 
-for data, desc in fixtures:
+for data, desc in gzip_fixtures:
 
 	dorf_gzip = test_call("gzip", data)
 	success = False
