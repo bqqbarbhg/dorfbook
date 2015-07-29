@@ -25,9 +25,9 @@
 // are the required distance away from each other.
 //
 // The matching word "latch-math" is a material match.
-//     ||               |   |          |        ||
-//-----^+---------------+---^----------^--------^|
-//------^---------------^------------------------^
+//     ||              |    |          |        ||
+//-----^+--------------+----^----------^--------^|
+//------^--------------^-------------------------^
 //
 // The only place where the two chains sync up is at the word "matching". Start
 // checking how many characters match again and update the end tuple (would be
