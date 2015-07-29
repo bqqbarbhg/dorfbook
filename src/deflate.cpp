@@ -62,50 +62,6 @@ size_t deflate_no_compress(void *dst, size_t dst_length,
 	return out - out_start;
 }
 
-struct Memory_Match
-{
-	const char *pos;
-	size_t length;
-};
-
-Memory_Match search_memory(const char *memory, size_t memory_len,
-	const char *match, size_t match_len)
-{
-	Memory_Match best_match;
-	best_match.pos = 0;
-	best_match.length = 0;
-
-	if (memory_len == 0 || match_len == 0)
-		return best_match;
-
-	const char *memory_end = memory + memory_len;
-	const char *match_end = match + match_len;
-	const char *pos = memory;
-	char begin = match[0];
-
-	for (;;) {
-		pos = (const char*)memchr(pos, begin, memory_end - pos);
-
-		if (!pos)
-			break;
-
-		const char *match_pos = match + 1;
-		const char *end = pos + 1;
-		for (; end < memory_end && match_pos < match_end; end++, match_pos++) {
-			if (*match_pos != *end)
-				break;
-		}
-
-		size_t len = end - pos;
-		if (len > best_match.length) {
-			best_match.pos = pos;
-			best_match.length = len;
-		}
-	}
-
-	return best_match;
-}
-
 struct Bit_Ptr
 {
 	uint8_t *data;
