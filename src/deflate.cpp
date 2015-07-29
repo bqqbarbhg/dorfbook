@@ -62,7 +62,218 @@ size_t deflate_no_compress(void *dst, size_t dst_length,
 	return out - out_start;
 }
 
-size_t gzip_no_compress(void *dst, size_t dst_length,
+struct Bit_Ptr
+{
+	uint8_t *data;
+	unsigned offset;
+};
+
+Bit_Ptr bit_ptr(void *data)
+{
+	Bit_Ptr ptr;
+	ptr.data = (uint8_t*)data;
+	*ptr.data = 0;
+	ptr.offset = 0;
+	return ptr;
+}
+
+void bit_write_lsb(Bit_Ptr *ptr, uint32_t val, unsigned bits)
+{
+	// Slow basic impl
+
+	uint32_t mask = 1 << bits;
+	uint8_t out = *ptr->data;
+	unsigned offset = ptr->offset;
+
+	for (unsigned bit = 0; bit < bits; bit++) {
+		if (offset >= sizeof(*ptr->data) * 8) {
+			ptr->offset = offset = 0;
+			*ptr->data = out;
+			ptr->data++;
+			*ptr->data = out = 0;
+		}
+
+		out |= ((val >> bit) & 1) << offset;
+		offset++;
+	}
+	*ptr->data = out;
+	ptr->offset = offset;
+}
+
+void bit_write_msb(Bit_Ptr *ptr, uint32_t val, unsigned bits)
+{
+	// Slow basic impl
+
+	uint32_t mask = 1 << bits;
+	uint8_t out = *ptr->data;
+	unsigned offset = ptr->offset;
+
+	for (unsigned bit = 0; bit < bits; bit++) {
+		if (offset >= sizeof(*ptr->data) * 8) {
+			ptr->offset = offset = 0;
+			*ptr->data = out;
+			ptr->data++;
+			*ptr->data = out = 0;
+		}
+
+		out |= ((val >> (bits - bit - 1)) & 1) << offset;
+		offset++;
+	}
+	*ptr->data = out;
+	ptr->offset = offset;
+}
+
+void* bit_finish(Bit_Ptr *ptr)
+{
+	return ptr->data + 1;
+}
+
+struct Code_Extra_Bucket
+{
+	int first_value;
+	int first_code;
+};
+
+// Note: 258 has it's own special encoding which is handled outside of this table
+const Code_Extra_Bucket length_buckets[] = {
+	{ 3, 257 }, { 11, 265 }, { 19, 269 }, { 35, 273 }, { 67, 277 }, { 131, 281 }
+};
+
+const Code_Extra_Bucket distance_buckets[] = {
+	{   1,  0 }, {   5,  4 }, {    9,  6 }, {   17,  8 }, {  33,  10 }, {   65, 12 }, {   129, 14 },
+	{ 257, 16 }, { 513, 18 }, { 1025, 20 }, { 2049, 22 }, { 4097, 24 }, { 8193, 26 }, { 16385, 18 }
+};
+
+struct Code_Extra
+{
+	int code;
+	int extra;
+	int extra_bits;
+};
+
+Code_Extra to_code_extra_coding(int value, const Code_Extra_Bucket *buckets, int bucket_count)
+{
+	for (int bits = bucket_count - 1; bits >= 0; bits--) {
+		Code_Extra_Bucket bucket = buckets[bits];
+		if (value >= bucket.first_value) {
+			int relative = value - bucket.first_value;
+
+			Code_Extra coding;
+			coding.code = bucket.first_code + (relative >> bits);
+			coding.extra = relative & ((1 << bits) - 1);
+			coding.extra_bits = bits;
+			return coding;
+		}
+	}
+	Code_Extra fail = { -1 };
+	return fail;
+}
+
+Code_Extra to_length_coding(int length)
+{
+	// Length 258 (the maximum length of a reference) has a special code with
+	// 0 extra bits.
+	if (length == 258) {
+		Code_Extra special_258_code = { 285, 0, 0 };
+		return special_258_code;
+	}
+
+	return to_code_extra_coding(length, length_buckets, Count(length_buckets));
+}
+
+Code_Extra to_distance_coding(int distance)
+{
+	return to_code_extra_coding(distance, distance_buckets, Count(distance_buckets));
+}
+
+void write_fixed_literal(Bit_Ptr *ptr, unsigned char c)
+{
+	if (c < 144) {
+		bit_write_msb(ptr, 0x30 + c, 8);
+	} else {
+		bit_write_msb(ptr, 0x190 + (c - 144), 9);
+	}
+}
+
+void write_fixed_reference(Bit_Ptr *ptr, int distance, int length)
+{
+	Code_Extra length_code = to_length_coding(length);
+	if (length_code.code < 280) {
+		bit_write_msb(ptr, length_code.code - 256, 7);
+	} else {
+		bit_write_msb(ptr, length_code.code - 280 + 192, 8);
+	}
+	if (length_code.extra_bits > 0) {
+		bit_write_lsb(ptr, length_code.extra, length_code.extra_bits);
+	}
+
+	Code_Extra distance_code = to_distance_coding(distance);
+	bit_write_msb(ptr, distance_code.code, 5);
+	if (distance_code.extra_bits > 0) {
+		bit_write_lsb(ptr, distance_code.extra, distance_code.extra_bits);
+	}
+}
+
+size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
+	const void *src, size_t src_length)
+{
+	const unsigned char *in = (const unsigned char*)src;
+
+	uint8_t *out_start = (uint8_t*)dst;
+	Bit_Ptr out = bit_ptr(out_start);
+
+	bit_write_lsb(&out, 3, 3);
+
+	Search_Context context;
+	init_search_context(&context, in, (int)src_length);
+
+	int pos = 0;
+	while (!search_done(&context)) {
+		Search_Match matches[128];
+		int match_count = search_next_matches(&context, matches, Count(matches));
+
+		for (int i = 0; i < match_count; i++) {
+			Search_Match match = matches[i];
+			if (pos > match.position)
+				continue;
+
+			while (pos < match.position) {
+				write_fixed_literal(&out, in[pos]);
+				pos++;
+			}
+
+			if (match.length <= 258) {
+				// Default case
+				write_fixed_reference(&out, match.offset, match.length);
+				pos += match.length;
+
+			} else {
+				// Splice longer matches into shorter ones
+				int length_left = match.length;
+				while (length_left > 3) {
+					int length = min(length_left, 258);
+
+					write_fixed_reference(&out, match.offset, length);
+					pos += length;
+					length_left -= length;
+				}
+			}
+		}
+	}
+	while (pos < src_length) {
+		write_fixed_literal(&out, in[pos]);
+		pos++;
+	}
+
+	free_search_context(&context);
+
+	bit_write_msb(&out, 0x0, 7);
+
+	uint8_t *out_end = (uint8_t*)bit_finish(&out);
+	return out_end - out_start;
+}
+
+size_t gzip_compress(void *dst, size_t dst_length,
 		const void *src, size_t src_length)
 {
 	unsigned char *out_start = (unsigned char*)dst;
@@ -99,7 +310,7 @@ size_t gzip_no_compress(void *dst, size_t dst_length,
 	*out++ = 0xff;
 
 	// Append the DEFLATE compressed data.
-	size_t len = deflate_no_compress(out, dst_length - 1, src, src_length);
+	size_t len = deflate_compress_fixed_block(out, dst_length - 1, src, src_length);
 	if (len == 0)
 		return 0;
 

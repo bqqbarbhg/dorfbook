@@ -27,6 +27,8 @@ for data, desc in fixtures:
 		extra = 'zlib: %s' % str(err.message)
 	except IOError as err:
 		extra = 'io: %s' % str(err.message)
+	except:
+		extra = 'other'
 
 	t.check(success, "gzip round trips", '%s, %s' % (extra, desc))
 

@@ -8,6 +8,7 @@
 #endif
 
 #include "../gen/pre_output.cpp"
+#include "compress_search.cpp"
 #include "deflate.cpp"
 #include "random.cpp"
 #include "dorf.cpp"
