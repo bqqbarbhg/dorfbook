@@ -10,7 +10,7 @@ set CLFlags= -MT -nologo -Od -W4 -WX -Zi %IgnoreWarn% -D_CRT_SECURE_NO_WARNINGS
 set LDFlags= -opt:ref user32.lib gdi32.lib shell32.lib ws2_32.lib
 
 cl %CLFlags% ../src/pre/pre_build.cpp -link %LDFlags% -out:pre_dorfbook.exe
-pre_dorfbook.exe ../gen/pre_output.cpp
+pre_dorfbook.exe ../gen/
 cl %CLFlags% ../src/build.cpp -link %LDFlags% -out:dorfbook.exe
 
 xcopy /qy ..\data data >NUL
