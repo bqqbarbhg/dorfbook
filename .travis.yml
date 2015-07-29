@@ -8,3 +8,5 @@ script:
 after_script:
   - cat bin/test_out.log
   - cat bin/test_err.log
+notifications:
+  email: false
