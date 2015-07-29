@@ -1,3 +1,45 @@
+// This file implements an algorithm to find recurring strings in a stream, which
+// can be used for compression. The algorithm is based on following chains of tuples.
+//
+// Example: The caret points at the position we are currently trying to find a
+// match for.
+//
+// The matching word "latch-math" is a material match.
+//                                                 ^
+//
+// Check the tuple of the next three characters [mat] and retrieve the chain.
+//
+// The matching word "latch-math" is a material match.
+//-----^--------------------^----------^--------^
+//
+// Then start following the chain backwards and see how many characters match.
+//
+//                                      ___
+//                                     match
+// The matching word "latch-math" is a material match.
+//                                     ~~~
+//
+// Then select a tuple that is one character past the end of the match ([atc] in
+// this case). This tuple must appear in every longer match than this. Retrieve
+// its chain also and now find locations where the two tuples (begin and end)
+// are the required distance away from each other.
+//
+// The matching word "latch-math" is a material match.
+//     ||               |   |          |        ||
+//-----^+---------------+---^----------^--------^|
+//------^---------------^------------------------^
+//
+// The only place where the two chains sync up is at the word "matching". Start
+// checking how many characters match again and update the end tuple (would be
+// set to [ch.] and continue with the algorithm until the chains run out.
+//
+// The implementation differs slightly from the above explanation. The chains
+// are not guaranteed to only have one tuple. The chains are formed by hashing
+// the tuple and looking up a table that is smaller than the amount of possible
+// tuples. This makes the algorithm a little bit slower but because the matches
+// are always scanned from the beginning, hash-collisions are detected and
+// skipped over.
+
 #define SEARCH_CHAIN_COUNT 4096
 #define SEARCH_DATA_COUNT 200000
 #define SEARCH_TUPLE_SIZE 3
@@ -5,13 +47,26 @@
 
 #define SEARCH_MAX_DIST 32000
 
+// Contains the data to follow a series of a recurring tuple through the data.
+// One chain might contain many tuples but one tuple is always sure to belong
+// to the same chain. So all instances of the tuple [abc] will be in the same
+// tuple.
 struct Search_Chain
 {
+	// Absolute byte index of the latest occurrence.
 	int base;
+
+	// Number of relative distances that can be stored in this chain still
+	// without having to reallocate it.
 	int capacity;
+
+	// Index to the `chain_data` buffer which contains the relative distances
+	// between the occurrences of the tuple.
 	uint32_t data_index;
 };
 
+// Match two series of bytes (up to max_length). Returns the number of bytes
+// that were equal.
 inline int strmatch(const char *a, const char *b, int max_length)
 {
 	int length;
@@ -23,6 +78,11 @@ inline int strmatch(const char *a, const char *b, int max_length)
 	return length;
 }
 
+// This is where most of the time is spent.
+// It lines up two chain iterators so that there is `target_dist` bytes between
+// them. `a` and `b` are absolute byte indices and `a_it` and `b_it` are
+// pointers to the chains relative advance distance lists.
+// Returns true if a synced position is found.
 inline bool sync_iterators(int *a, uint16_t **a_it, int *b, uint16_t **b_it,
 	int target_dist, int pos)
 {
@@ -30,7 +90,7 @@ inline bool sync_iterators(int *a, uint16_t **a_it, int *b, uint16_t **b_it,
 	uint16_t *a_iter = *a_it, *b_iter = *b_it;
 	int stop = pos - SEARCH_MAX_DIST;
 
-	// Adjust base
+	// Adjust base so that negative positions are unreachable.
 	a_pos -= stop;
 	b_pos -= stop;
 
@@ -48,6 +108,7 @@ inline bool sync_iterators(int *a, uint16_t **a_it, int *b, uint16_t **b_it,
 			}
 
 		} else {
+			// Adjust the base back and store result.
 			*a = a_pos + stop;
 			*b = b_pos + stop;
 			*a_it = a_iter;
@@ -59,6 +120,7 @@ inline bool sync_iterators(int *a, uint16_t **a_it, int *b, uint16_t **b_it,
 	return false;
 }
 
+// This hash is the chain id for the tuple.
 unsigned tuplehash(const char *data)
 {
 	unsigned hash = 0;
@@ -68,6 +130,7 @@ unsigned tuplehash(const char *data)
 	return hash;
 }
 
+// Used for marking in the garbage collection.
 struct Live_Chain
 {
 	unsigned chain_index;
@@ -80,6 +143,10 @@ int live_chain_compare(const void *a, const void *b)
 	return ((Live_Chain*)a)->data_index - ((Live_Chain*)b)->data_index;
 }
 
+// Since the chains are dynamically allocated in a buffer it can run out of space.
+// In this case we run a garbage collection, which frees all the unreachable
+// chain nodes and unused memory.
+// Returns the amount of the used space of the `chain_data` buffer.
 unsigned chain_data_gc(Search_Chain *chains, unsigned chain_count, uint16_t *chain_data, unsigned chain_data_count, int pos)
 {
 	Live_Chain *live_chains = (Live_Chain*)malloc(sizeof(Live_Chain) * chain_count);
@@ -96,18 +163,21 @@ unsigned chain_data_gc(Search_Chain *chains, unsigned chain_count, uint16_t *cha
 		uint16_t *start = &chain_data[chain_data_index];
 		uint16_t *iter = start;
 
+		// Follow the chain as far as possible
 		while (chain_pos >= drop_at) {
 			chain_pos -= *iter++;
 		}
 
+		// Length is one shorter since the last one is always the terminator.
 		int length = (int)(iter - start - 1);
+
+		// If there are not enough dynamic nodes we can point it at the null chain.
 		if (length <= 0) {
-			if (length < 0) {
-				chain->base = -SEARCH_MAX_DIST;
-			}
 			chain->data_index = 0;
 			continue;
 		}
+
+		// Keep the chain
 		Live_Chain *live_chain = &live_chains[live_chain_count++];
 		live_chain->chain_index = i;
 		live_chain->data_index = chain_data_index;
@@ -117,14 +187,19 @@ unsigned chain_data_gc(Search_Chain *chains, unsigned chain_count, uint16_t *cha
 	// Leave null index at 0.
 	unsigned data_index = 1;
 
+	// If the chains are sorted then when copying the live ones there is no need
+	// for an extra buffer since the elements always shrink there is never the
+	// danger of overwriting other live chains.
 	qsort(live_chains, live_chain_count, sizeof(Live_Chain), &live_chain_compare);
 
 	for (unsigned i = 0; i < live_chain_count; i++) {
 		Live_Chain *live = &live_chains[i];
-
 		Search_Chain *chain = &chains[live->chain_index];
+
 		memcpy(&chain_data[data_index], &chain_data[live->data_index],
 				live->data_length * sizeof(uint16_t));
+
+		// The chains always end with a terminator, but it's not counted in length.
 		chain_data[live->data_index + live->data_length] = 0xFFFF;
 
 		chain->data_index = data_index;
@@ -197,6 +272,8 @@ int search_next_matches(Search_Context *context, Search_Match *matches, int max_
 	unsigned chain_data_size = SEARCH_DATA_COUNT;
 	int match_count = 0;
 
+	// Restore the state from context to the stack, this should help compilers
+	// optimize the variables better.
 	const char *data = context->data;
 	int length = context->length;
 
@@ -216,174 +293,192 @@ int search_next_matches(Search_Context *context, Search_Match *matches, int max_
 		if (match_count >= max_matches)
 			break;
 
-		if (pos + SEARCH_TUPLE_SIZE <= length) {
-			const char *pos_str = &data[pos];
+		if (pos + SEARCH_TUPLE_SIZE > length) {
+			// This algorithm can't find matches that are less than the tuple
+			// size in length. But in practice that's not a problem because there
+			// is no need for that short matches anyway.
+			continue;
+		}
 
-			unsigned hash = tuplehash(pos_str) % SEARCH_CHAIN_COUNT;
-			Search_Chain *chain = &chains[hash];
+		const char *pos_str = &data[pos];
 
-			int begin_pos = chain->base;
-			int pos_diff = pos - begin_pos;
+		// Find the chain the beginning tuple of this match belongs to.
+		unsigned hash = tuplehash(pos_str) % SEARCH_CHAIN_COUNT;
+		Search_Chain *chain = &chains[hash];
 
-			// This is the new base for the chain
-			chain->base = pos;
+		int begin_pos = chain->base;
+		int pos_diff = pos - begin_pos;
 
-			if (pos_diff >= SEARCH_MAX_DIST) {
-				// Never seen or too far to reference: Orphan the chain.
-				chain->capacity = 0;
-				chain->data_index = 0;
+		// Set as the new base of the chain.
+		chain->base = pos;
+
+		if (pos_diff >= SEARCH_MAX_DIST) {
+			// Never seen or too far to reference: Orphan the chain.
+			chain->capacity = 0;
+			chain->data_index = 0;
+			continue;
+		}
+
+		// If there is not enough space in the chain, its storage needs to be reallocated
+		if (chain->capacity == 0) {
+			uint16_t *begin = &chain_data[chain->data_index];
+			uint16_t *iter = begin;
+
+			int chain_diff = pos_diff;
+			do {
+				chain_diff += *iter++;
+			} while (chain_diff < SEARCH_MAX_DIST);
+
+			unsigned length = (int)(iter - begin);
+
+			// Grow the allocation geometrically to reduce the amount of reallocations needed.
+			unsigned alloc_amount = length * 2;
+
+			// If there is no space try to do a garbage collection, if that doesn't help give up.
+			if (chain_data_head + alloc_amount > chain_data_size) {
+
+				chain_data_head = chain_data_gc(chains, SEARCH_CHAIN_COUNT,
+					chain_data, chain_data_size, pos);
+
+				if (chain_data_head + alloc_amount > chain_data_size) {
+					return false;
+				}
+			}
+
+			unsigned capacity = alloc_amount - length;
+			int data_begin = chain_data_head + capacity;
+
+			// Copy the old data.
+			memcpy(chain_data + data_begin, begin, length * sizeof(uint16_t));
+
+			chain->data_index = data_begin;
+			chain->capacity = capacity;
+
+			chain_data_head += alloc_amount;
+		}
+
+		// Add the distance to the previous occurrence to the chain.
+		chain->capacity--;
+		chain_data[--chain->data_index] = (uint16_t)pos_diff;
+
+		uint16_t *begin_iter = chain_data + chain->data_index + 1;
+
+		// Info about the current match candidate.
+		int match_pos = 0;
+		int match_length = 0;
+		bool best_match = false;
+
+		// The chain and iterator for the tuple that is required for a match
+		// that is longer than the previous matches.
+		Search_Chain *end_chain = 0;
+		int end_pos;
+		uint16_t *end_iter;
+
+		int target_match_length = SEARCH_TUPLE_SIZE;
+
+		// Can't match the buffer but don't limit the match lengths since it
+		// breaks the buffering of the matches. Let the calling code splice
+		// the too long matches into smaller ones (easy)
+		int input_left = length - pos;
+		int max_match_length = input_left;
+
+		// If this match is a sub-match of the previous one we have already
+		// found a match which is one byte shorter than the last one.
+		int submatch_length = last_match_length - 1;
+		if (submatch_length > SEARCH_TUPLE_SIZE) {
+			// Set as new minimum goal
+			match_pos = last_match_pos + 1;
+			match_length = submatch_length;
+
+			if (last_match_was_best) {
+				// If the last match was the best possible match just accept it.
+				last_match_was_best = true;
+				last_match_pos = match_pos;
+				last_match_length = match_length;
 				continue;
 			}
 
-			if (chain->capacity == 0) {
-				uint16_t *begin = &chain_data[chain->data_index];
-				uint16_t *iter = begin;
-				int chain_diff = pos_diff;
-				do {
-					chain_diff += *iter++;
-				} while (chain_diff < SEARCH_MAX_DIST);
-				unsigned length = (int)(iter - begin);
-				unsigned alloc_amount = length * 2;
-				unsigned capacity = alloc_amount - length;
+			// Re-use the previous end tuple, since it must be included in any
+			// longer matches than the current submatch of the previous one.
+			end_chain = last_end_chain;
+			end_pos = end_chain->base;
+			end_iter = chain_data + end_chain->data_index;
+			target_match_length = last_match_length;
+		}
 
-				if (chain_data_head + alloc_amount > chain_data_size) {
-					chain_data_head = chain_data_gc(chains, SEARCH_CHAIN_COUNT,
-						chain_data, chain_data_size, pos);
-					if (chain_data_head + alloc_amount > chain_data_size) {
-						return -1;
-					}
-				}
-
-				int data_begin = chain_data_head + capacity;
-				memcpy(chain_data + data_begin, begin, length * sizeof(uint16_t));
-				chain->data_index = data_begin;
-				chain->capacity = capacity;
-
-				chain_data_head += alloc_amount;
+		do {
+			// If we have an end chain make sure that we only check places where
+			// the begin and end iterators are separated by the target distance
+			int target_dist = target_match_length - SEARCH_TUPLE_SIZE;
+			if (end_chain && !sync_iterators(&begin_pos, &begin_iter, &end_pos, &end_iter, target_dist, pos)) {
+				break;
 			}
 
-			chain->capacity--;
-			chain_data[--chain->data_index] = (uint16_t)pos_diff;
+			// Compare the reference byte-by-byte as far as they match.
+			int length = strmatch(pos_str, &data[begin_pos], max_match_length);
+			int mpos = begin_pos;
 
-			uint16_t *begin_iter = chain_data + chain->data_index + 1;
+			if (length >= target_match_length) {
 
-			int match_pos = 0;
-			int match_length = 0;
-			bool best_match = false;
+				// Found a new longest match!
+				match_length = length;
+				match_pos = mpos;
 
-			Search_Chain *end_chain = 0;
-			int end_pos;
-			uint16_t *end_iter;
-
-			int target_match_length = SEARCH_TUPLE_SIZE;
-
-			int input_left = length - pos;
-			int max_match_length = input_left;
-
-			// If this match is a sub-match of the previous one we have already
-			// found a match which is one byte shorter than the last one.
-			int submatch_length = last_match_length - 1;
-			if (submatch_length > SEARCH_TUPLE_SIZE) {
-				// Set as new minimum goal
-				match_pos = last_match_pos + 1;
-				match_length = submatch_length;
-
-				if (last_match_was_best) {
-					// If the last match was the best possible match just accept it.
-					last_match_was_best = true;
-					last_match_pos = match_pos;
-					last_match_length = match_length;
-					continue;
-				}
-
-
-				end_chain = last_end_chain;
-				end_pos = end_chain->base;
-				end_iter = chain_data + end_chain->data_index;
-				target_match_length = last_match_length;
-			}
-
-			do {
-				// If we have an end chain make sure that we only check places where
-				// the begin and end iterators are separated by the target distance
-				int target_dist = target_match_length - SEARCH_TUPLE_SIZE;
-				if (end_chain && !sync_iterators(&begin_pos, &begin_iter, &end_pos, &end_iter, target_dist, pos)) {
+				if (match_length == max_match_length) {
+					// Accept as the best match.
+					best_match = true;
 					break;
 				}
 
-				// Compare the reference byte-by-byte as far as they match.
-				int length = strmatch(pos_str, &data[begin_pos], max_match_length);
-				int mpos = begin_pos;
+				// We MUST have additional characters left that could match, create the tuple
+				// of the source string that contains one character past of the current best
+				// match.
 
-				begin_pos -= *begin_iter++;
+				const int end_offset = match_length - SEARCH_TUPLE_SIZE + 1;
+				unsigned end_hash = tuplehash(pos_str + end_offset) % SEARCH_CHAIN_COUNT;
 
-				if (length >= target_match_length) {
+				Search_Chain *chain = &chains[end_hash];
 
-					match_length = length;
-					match_pos = mpos;
-
-					if (match_length == max_match_length) {
-						// Accept as the best match.
-						best_match = true;
-						break;
-					}
-
-					// We MUST have additional characters left that could match, create the tuple
-					// of the source string that contains one character past of the current best
-					// match.
-
-					const int end_offset = match_length - SEARCH_TUPLE_SIZE + 1;
-					unsigned end_hash = tuplehash(pos_str + end_offset) % SEARCH_CHAIN_COUNT;
-
-					Search_Chain *chain = &chains[end_hash];
-
-					if (pos - chain->base >= SEARCH_MAX_DIST) {
-						// There is no instance of a tuple that is required to continue the match
-						// therefore this is the best match.
-						best_match = true;
-						break;
-					}
-
-					end_chain = chain;
-					end_pos = end_chain->base;
-					end_iter = chain_data + end_chain->data_index;
-
-					target_match_length = match_length + 1;
-
-					/*
-					int stop = begin_pos + target_match_length - SEARCH_TUPLE_SIZE;
-					while (end_pos > stop) {
-						end_pos -= *end_iter++;
-					}
-
-					if (pos - end_pos >= SEARCH_MAX_DIST)
-						break;
-						*/
+				if (pos - chain->base >= SEARCH_MAX_DIST) {
+					// There is no instance of a tuple that is required to continue the match
+					// therefore this is the best match.
+					best_match = true;
+					break;
 				}
 
-			} while (pos - begin_pos < SEARCH_MAX_DIST);
+				end_chain = chain;
+				end_pos = end_chain->base;
+				end_iter = chain_data + end_chain->data_index;
 
-			if (match_length >= SEARCH_TUPLE_SIZE && match_length >= last_match_length) {
-				Search_Match *match = &matches[match_count++];
-				match->position = pos;
-				match->offset = pos - match_pos;
-				match->length = match_length;
+				target_match_length = match_length + 1;
 			}
 
-			last_end_chain = end_chain;
-			last_match_length = match_length;
-			last_match_was_best = best_match;
+			// Advance.
+			begin_pos -= *begin_iter++;
+		} while (pos - begin_pos < SEARCH_MAX_DIST);
+
+		// If there was a match and it's not _completely_ included in the last one
+		// write it to the buffer.
+		if (match_length >= SEARCH_TUPLE_SIZE && match_length >= last_match_length) {
+			Search_Match *match = &matches[match_count++];
+			match->position = pos;
+			match->offset = pos - match_pos;
+			match->length = match_length;
 		}
+
+		last_end_chain = end_chain;
+		last_match_length = match_length;
+		last_match_was_best = best_match;
 	}
 
+	// Store the cached data back to the context.
 	context->chain_data_head = chain_data_head;
-
 	context->last_end_chain = last_end_chain;
 	context->last_match_pos = last_match_pos;
 	context->last_match_length = last_match_length;
 	context->last_match_was_best = last_match_was_best;
-
 	context->position = pos;
+
 	return match_count;
 }
 
