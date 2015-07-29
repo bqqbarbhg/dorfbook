@@ -317,7 +317,7 @@ size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
 	return out_end - out_start;
 }
 
-size_t gzip_no_compress(void *dst, size_t dst_length,
+size_t gzip_compress(void *dst, size_t dst_length,
 		const void *src, size_t src_length)
 {
 	unsigned char *out_start = (unsigned char*)dst;

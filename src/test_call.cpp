@@ -17,7 +17,7 @@ size_t test_crc32(char *out_buffer, const char* in_buffer, size_t length)
 
 size_t test_gzip(char *out_buffer, const char* in_buffer, size_t length)
 {
-	return gzip_no_compress(out_buffer, TEST_BUFFER_SIZE, in_buffer, length);
+	return gzip_compress(out_buffer, TEST_BUFFER_SIZE, in_buffer, length);
 }
 
 Test_Def test_defs[] = {
