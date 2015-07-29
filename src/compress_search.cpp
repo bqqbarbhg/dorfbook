@@ -4,7 +4,6 @@
 #define MAX_SYNC_AMOUNT 10000
 
 #define SEARCH_MAX_DIST 32000
-#define SEARCH_MAX_LENGTH 258
 
 struct Search_Chain
 {
@@ -257,7 +256,7 @@ int search_next_matches(Search_Context *context, Search_Match *matches, int max_
 
 				int data_begin = chain_data_head + capacity;
 				memcpy(chain_data + data_begin, begin, length * sizeof(uint16_t));
-				chain->data_index = data_begin; 
+				chain->data_index = data_begin;
 				chain->capacity = capacity;
 
 				chain_data_head += alloc_amount;
@@ -277,11 +276,9 @@ int search_next_matches(Search_Context *context, Search_Match *matches, int max_
 			uint16_t *end_iter;
 
 			int target_match_length = SEARCH_TUPLE_SIZE;
-			int max_match_length = SEARCH_MAX_LENGTH;
 
 			int input_left = length - pos;
-			if (max_match_length > input_left)
-				max_match_length = input_left;
+			int max_match_length = input_left;
 
 			// If this match is a sub-match of the previous one we have already
 			// found a match which is one byte shorter than the last one.
@@ -375,7 +372,7 @@ int search_next_matches(Search_Context *context, Search_Match *matches, int max_
 
 			last_end_chain = end_chain;
 			last_match_length = match_length;
-			last_match_was_best = best_match; 
+			last_match_was_best = best_match;
 		}
 	}
 

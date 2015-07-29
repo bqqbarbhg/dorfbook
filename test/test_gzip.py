@@ -12,10 +12,7 @@ for _ in range(5):
 
 	t.check(dorf_crc == zlib_crc, "crc32 is compatible with zlib")
 
-
-for _ in range(5):
-	length = random.randint(1, 10000)
-	content = str(random.choice(string.printable) for _ in range(length))
+for data, desc in fixtures + gzip_fixtures:
 
 	dorf_gzip = test_call("gzip", content)
 	success = False
