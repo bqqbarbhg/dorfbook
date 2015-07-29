@@ -172,15 +172,20 @@ void* bit_finish(Bit_Ptr *ptr)
 	return ptr->data + 1;
 }
 
-// Note: 258 has it's own special encoding which is handled outside of this table
-const int length_base_code = 257;
-const int length_buckets[] = {
-	3, 11, 19, 35, 67, 131
+struct Code_Extra_Bucket
+{
+	int first_value;
+	int first_code;
 };
 
-const int distance_base_code = 0;
-const int distance_buckets[] = {
-	1, 5, 9, 13, 17, 33, 65, 129, 257, 513, 1025, 2049, 4097, 8193, 16385
+// Note: 258 has it's own special encoding which is handled outside of this table
+const Code_Extra_Bucket length_buckets[] = {
+	{ 3, 257 }, { 11, 265 }, { 19, 269 }, { 35, 273 }, { 67, 277 }, { 131, 281 }
+};
+
+const Code_Extra_Bucket distance_buckets[] = {
+	{   1,  0 }, {   5,  4 }, {    9,  6 }, {   17,  8 }, {  33,  10 }, {   65, 12 }, {   129, 14 },
+	{ 257, 16 }, { 513, 18 }, { 1025, 20 }, { 2049, 22 }, { 4097, 24 }, { 8193, 26 }, { 16385, 18 }
 };
 
 struct Code_Extra
@@ -190,16 +195,15 @@ struct Code_Extra
 	int extra_bits;
 };
 
-Code_Extra to_code_extra_coding(int value, int base_code,
-	const int *buckets, int bucket_count)
+Code_Extra to_code_extra_coding(int value, const Code_Extra_Bucket *buckets, int bucket_count)
 {
 	for (int bits = bucket_count - 1; bits >= 0; bits--) {
-		int bucket_start = buckets[bits];
-		if (value >= bucket_start) {
-			int relative = value - bucket_start;
+		Code_Extra_Bucket bucket = buckets[bits];
+		if (value >= bucket.first_value) {
+			int relative = value - bucket.first_value;
 
 			Code_Extra coding;
-			coding.code = base_code + (relative >> bits);
+			coding.code = bucket.first_code + (relative >> bits);
 			coding.extra = relative & ((1 << bits) - 1);
 			coding.extra_bits = bits;
 			return coding;
@@ -211,21 +215,19 @@ Code_Extra to_code_extra_coding(int value, int base_code,
 
 Code_Extra to_length_coding(int length)
 {
-	// Length 285 (the maximum length of a reference) has a special code with
+	// Length 258 (the maximum length of a reference) has a special code with
 	// 0 extra bits.
-	if (length == 285) {
-		Code_Extra special_285_code = { 258, 0, 0 };
-		return special_285_code;
+	if (length == 258) {
+		Code_Extra special_258_code = { 285, 0, 0 };
+		return special_258_code;
 	}
 
-	return to_code_extra_coding(length, length_base_code,
-		length_buckets, Count(length_buckets));
+	return to_code_extra_coding(length, length_buckets, Count(length_buckets));
 }
 
 Code_Extra to_distance_coding(int distance)
 {
-	return to_code_extra_coding(distance, distance_base_code,
-		distance_buckets, Count(distance_buckets));
+	return to_code_extra_coding(distance, distance_buckets, Count(distance_buckets));
 }
 
 void write_fixed_literal(Bit_Ptr *ptr, unsigned char c)
@@ -246,13 +248,13 @@ void write_fixed_reference(Bit_Ptr *ptr, int distance, int length)
 		bit_write_msb(ptr, length_code.code - 280 + 192, 8);
 	}
 	if (length_code.extra_bits > 0) {
-		bit_write_msb(ptr, length_code.extra, length_code.extra_bits);
+		bit_write_lsb(ptr, length_code.extra, length_code.extra_bits);
 	}
 
 	Code_Extra distance_code = to_distance_coding(distance);
 	bit_write_msb(ptr, distance_code.code, 5);
 	if (distance_code.extra_bits > 0) {
-		bit_write_msb(ptr, distance_code.extra, distance_code.extra_bits);
+		bit_write_lsb(ptr, distance_code.extra, distance_code.extra_bits);
 	}
 }
 
@@ -281,10 +283,30 @@ size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
 
 			while (pos < match.position) {
 				write_fixed_literal(&out, in[pos]);
+				pos++;
 			}
-			write_fixed_reference(&out, match.offset, match.length);
-			pos += match.length;
+
+			if (match.length <= 258) {
+				// Default case
+				write_fixed_reference(&out, match.offset, match.length);
+				pos += match.length;
+
+			} else {
+				// Splice longer matches into shorter ones
+				int length_left = match.length;
+				while (length_left > 3) {
+					int length = min(length_left, 258);
+
+					write_fixed_reference(&out, match.offset, length);
+					pos += length;
+					length_left -= length;
+				}
+			}
 		}
+	}
+	while (pos < src_length) {
+		write_fixed_literal(&out, in[pos]);
+		pos++;
 	}
 
 	free_search_context(&context);
