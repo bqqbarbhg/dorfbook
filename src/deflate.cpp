@@ -172,25 +172,122 @@ void* bit_finish(Bit_Ptr *ptr)
 	return ptr->data + 1;
 }
 
+// Note: 258 has it's own special encoding which is handled outside of this table
+const int length_base_code = 257;
+const int length_buckets[] = {
+	3, 11, 19, 35, 67, 131
+};
+
+const int distance_base_code = 0;
+const int distance_buckets[] = {
+	1, 5, 9, 13, 17, 33, 65, 129, 257, 513, 1025, 2049, 4097, 8193, 16385
+};
+
+struct Code_Extra
+{
+	int code;
+	int extra;
+	int extra_bits;
+};
+
+Code_Extra to_code_extra_coding(int value, int base_code,
+	const int *buckets, int bucket_count)
+{
+	for (int bits = bucket_count - 1; bits >= 0; bits--) {
+		int bucket_start = buckets[bits];
+		if (value >= bucket_start) {
+			int relative = value - bucket_start;
+
+			Code_Extra coding;
+			coding.code = base_code + (relative >> bits);
+			coding.extra = relative & ((1 << bits) - 1);
+			coding.extra_bits = bits;
+			return coding;
+		}
+	}
+	Code_Extra fail = { -1 };
+	return fail;
+}
+
+Code_Extra to_length_coding(int length)
+{
+	// Length 285 (the maximum length of a reference) has a special code with
+	// 0 extra bits.
+	if (length == 285) {
+		Code_Extra special_285_code = { 258, 0, 0 };
+		return special_285_code;
+	}
+
+	return to_code_extra_coding(length, length_base_code,
+		length_buckets, Count(length_buckets));
+}
+
+Code_Extra to_distance_coding(int distance)
+{
+	return to_code_extra_coding(distance, distance_base_code,
+		distance_buckets, Count(distance_buckets));
+}
+
+void write_fixed_literal(Bit_Ptr *ptr, unsigned char c)
+{
+	if (c < 144) {
+		bit_write_msb(ptr, 0x30 + c, 8);
+	} else {
+		bit_write_msb(ptr, 0x190 + (c - 144), 9);
+	}
+}
+
+void write_fixed_reference(Bit_Ptr *ptr, int distance, int length)
+{
+	Code_Extra length_code = to_length_coding(length);
+	if (length_code.code < 280) {
+		bit_write_msb(ptr, length_code.code - 256, 7);
+	} else {
+		bit_write_msb(ptr, length_code.code - 280 + 192, 8);
+	}
+	if (length_code.extra_bits > 0) {
+		bit_write_msb(ptr, length_code.extra, length_code.extra_bits);
+	}
+
+	Code_Extra distance_code = to_distance_coding(distance);
+	bit_write_msb(ptr, distance_code.code, 5);
+	if (distance_code.extra_bits > 0) {
+		bit_write_msb(ptr, distance_code.extra, distance_code.extra_bits);
+	}
+}
+
 size_t deflate_compress_fixed_block(void *dst, size_t dst_length,
 	const void *src, size_t src_length)
 {
-	const char *in = (const char*)src;
+	const unsigned char *in = (const unsigned char*)src;
 
 	uint8_t *out_start = (uint8_t*)dst;
 	Bit_Ptr out = bit_ptr(out_start);
 
 	bit_write_lsb(&out, 3, 3);
 
-	for (size_t pos = 0; pos < src_length; pos++) {
+	Search_Context context;
+	init_search_context(&context, in, (int)src_length);
 
-		char c = in[pos];
-		if (c < 144) {
-			bit_write_msb(&out, 0x30 + c, 8);
-		} else {
-			bit_write_msb(&out, 0x190 + (c - 144), 9);
+	int pos = 0;
+	while (!search_done(&context)) {
+		Search_Match matches[128];
+		int match_count = search_next_matches(&context, matches, Count(matches));
+
+		for (int i = 0; i < match_count; i++) {
+			Search_Match match = matches[i];
+			if (pos > match.position)
+				continue;
+
+			while (pos < match.position) {
+				write_fixed_literal(&out, in[pos]);
+			}
+			write_fixed_reference(&out, match.offset, match.length);
+			pos += match.length;
 		}
 	}
+
+	free_search_context(&context);
 
 	bit_write_msb(&out, 0x0, 7);
 
