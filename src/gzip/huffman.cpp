@@ -68,6 +68,7 @@ int canonical_huffman(Huffman_Code *out_codes, int *code_uses, int code_count, i
 	memset(out_codes, 0, sizeof(Huffman_Code) * code_count);
 
 	if (leaf_count == 0) {
+		free(tree_storage);
 		return 0;
 	}
 
@@ -139,6 +140,9 @@ int canonical_huffman(Huffman_Code *out_codes, int *code_uses, int code_count, i
 		int length = out_codes[i].bits;
 		if (length > max_length) {
 			// TODO: Deal with this.
+			free(bits_count);
+			free(bits_code);
+			free(tree_storage);
 			return -1;
 		}
 		if (length > 0) {
