@@ -9,6 +9,7 @@
 
 #include "../gen/pre_output.cpp"
 #include "gzip/compress_search.cpp"
+#include "gzip/huffman.cpp"
 #include "gzip/deflate.cpp"
 #include "random.cpp"
 #include "dorf.cpp"
