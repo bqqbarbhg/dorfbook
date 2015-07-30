@@ -403,6 +403,7 @@ size_t deflate_compress_dynamic_block(void *dst, size_t dst_length,
 
 		match_size *= 2;
 	}
+	free_search_context(&context);
 
 	// Count how many times each symbol is used
 	int literal_length_count[286] = { 0 };
