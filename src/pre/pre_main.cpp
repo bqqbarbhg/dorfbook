@@ -17,6 +17,8 @@ char *combine_path(const char *root, const char *path)
 	memcpy(result_ptr, path, path_len);
 	result_ptr += path_len;
 
+	*result_ptr = '\0';
+
 	return result_buffer;
 }
 
