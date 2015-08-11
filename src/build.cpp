@@ -8,6 +8,10 @@
 #endif
 
 #include "../gen/pre_output.cpp"
+#include "strings.cpp"
+#include "memory.cpp"
+#include "string_table.cpp"
+#include "xml.cpp"
 #include "gzip/compress_search.cpp"
 #include "gzip/deflate.cpp"
 #include "random.cpp"
