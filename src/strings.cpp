@@ -28,3 +28,8 @@ inline String c_string(const char *str)
 	return to_string((char*)str, strlen(str));
 }
 
+inline String char_string(char c)
+{
+	return to_string((char*)&all_chars_table[(U8)c], 1);
+}
+

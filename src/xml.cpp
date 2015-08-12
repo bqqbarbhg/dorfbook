@@ -135,7 +135,7 @@ bool xml_get_entity(String *value, XML *xml, Interned_String key)
 {
 	XML_Entity_List entities = xml->entities;
 	for (size_t i = 0; i < entities.count; i++) {
-		// TODO: This is ugly
+		// @Cleanup: This has lots of nested members
 		if (entities.data[i].key.string.data == key.string.data) {
 			*value = entities.data[i].value;
 			return true;
@@ -191,6 +191,14 @@ bool xml_text_until(String *text, XML *xml, Scanner *s, String suffix)
 	return false;
 }
 
+inline bool scanner_skip(Scanner *s, size_t amount)
+{
+	if ((size_t)(s->end - s->pos) < amount)
+		return false;
+	s->pos += amount;
+	return true;
+}
+
 inline bool scanner_end(Scanner *s)
 {
 	return s->pos == s->end;
@@ -204,11 +212,11 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 	Scanner *s = &scanner;
 
 	const XML_Entity default_entities[] = {
-		{ intern(&xml->string_table, c_string("lt")), c_string("<") },
-		{ intern(&xml->string_table, c_string("gt")), c_string(">") },
-		{ intern(&xml->string_table, c_string("amp")), c_string("&") },
-		{ intern(&xml->string_table, c_string("apos")), c_string("'") },
-		{ intern(&xml->string_table, c_string("quot")), c_string("\"") },
+		{ intern(&xml->string_table, c_string("lt")), char_string('<') },
+		{ intern(&xml->string_table, c_string("gt")), char_string('>') },
+		{ intern(&xml->string_table, c_string("amp")), char_string('&') },
+		{ intern(&xml->string_table, c_string("apos")), char_string('\'') },
+		{ intern(&xml->string_table, c_string("quot")), char_string('"') },
 	};
 
 	list_push(&xml->entities, default_entities, Count(default_entities));
@@ -218,6 +226,10 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 
 	while (!scanner_end(s)) {
 		accept_whitespace(s);
+
+		if (scanner_end(s))
+			break;
+
 		if (accept(s, '<')) {
 			if (accept(s, '/')) {
 				if (!parent) {
@@ -235,7 +247,8 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 
 				accept_whitespace(s);
 
-				// TODO: Attributes
+				Push_Stream attr_stream = start_push_stream(&xml->attribute_alloc);
+
 				String attr_name;
 				while (accept_xml_name(&attr_name, s)) {
 					accept_whitespace(s);
@@ -243,16 +256,28 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 					accept_whitespace(s);
 					char quote = accept_any(s, "\"'", 2);
 					if (!quote) return false;
-					// TODO: Parse
-					while (!accept(s, quote)) {
-						if (scanner_end(s)) return false;
-					}
+
+					String text;
+					if (!xml_text_until(&text, xml, s, char_string(quote)))
+						return false;
+
+					// xml_text_until already matched the ending quote
+					scanner_skip(s, 1);
+
 					accept_whitespace(s);
+
+					XML_Attribute *attr = STREAM_ALLOC(&attr_stream, XML_Attribute);
+					attr->key = intern(&xml->string_table, attr_name);
+					attr->value = text;
 				}
 
 				XML_Node *new_node = PUSH_ALLOC(&xml->node_alloc, XML_Node);
 				new_node->tag = intern(&xml->string_table, tag_name);
-				new_node->attribute_count = 0;
+
+				// @Cleanup: This is too low-level code for here
+				Data_Slice slice = finish_push_stream(&attr_stream);
+				new_node->attributes = (XML_Attribute*)slice.data;
+				new_node->attribute_count = (U32)(slice.length / sizeof(XML_Attribute));
 
 				new_node->parent = parent;
 				new_node->prev = prev;

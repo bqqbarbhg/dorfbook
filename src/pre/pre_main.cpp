@@ -31,6 +31,7 @@ int main(int argc, char** argv)
 	pre_out = fopen(path, "w");
 
 	make_crc32_table();
+	make_all_chars_table();
 
 	fclose(pre_out);
 	free(path);

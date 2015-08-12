@@ -86,7 +86,7 @@ inline Data_Slice finish_push_stream(Push_Stream *stream)
 {
 	Data_Slice slice;
 	slice.data = stream->allocator->page.buffer + stream->start;
-	slice.length = stream->allocator->page.size - stream->start;
+	slice.length = stream->allocator->page.position - stream->start;
 	return slice;
 }
 
