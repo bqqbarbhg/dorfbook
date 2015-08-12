@@ -118,7 +118,7 @@ Interned_String intern(String_Table *table, String str)
 {
 	if (str.length == 0) {
 		Interned_String empty;
-		empty.string = to_string("", 0);
+		empty.string = empty_string();
 		return empty;
 	}
 

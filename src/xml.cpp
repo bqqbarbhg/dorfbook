@@ -11,6 +11,13 @@ struct XML_Attribute
 	String value;
 };
 
+struct XML_Entity
+{
+	Interned_String key;
+	String value;
+};
+LIST_STRUCT(XML_Entity);
+
 struct XML_Node
 {
 	Interned_String tag;
@@ -30,7 +37,11 @@ struct XML
 {
 	Push_Allocator attribute_alloc;
 	Push_Allocator node_alloc;
+	Push_Allocator text_alloc;
+
 	String_Table string_table;
+
+	XML_Entity_List entities;
 
 	XML_Node *root;
 };
@@ -120,6 +131,66 @@ inline char accept_any(Scanner *s, const char *chars, int char_count)
 	return '\0';
 }
 
+bool xml_get_entity(String *value, XML *xml, Interned_String key)
+{
+	XML_Entity_List entities = xml->entities;
+	for (size_t i = 0; i < entities.count; i++) {
+		// TODO: This is ugly
+		if (entities.data[i].key.string.data == key.string.data) {
+			*value = entities.data[i].value;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool xml_text_until(String *text, XML *xml, Scanner *s, String suffix)
+{
+	if (suffix.length == 0) return false;
+	char suffix_start = suffix.data[0];
+
+	Push_Stream stream = start_push_stream(&xml->text_alloc);
+
+	const char *pos = s->pos;
+	const char *end = s->end;
+
+	if ((size_t)(end - pos) < suffix.length)
+		return false;
+	end -= suffix.length;
+
+	for (; pos != end; pos++) {
+
+		char c = *pos;
+		if (c == suffix_start) {
+			if (!memcmp(pos + 1, suffix.data + 1, suffix.length - 1)) {
+				s->pos = pos;
+				*text = finish_push_stream_string(&stream);
+				return true;
+			}
+		} else if (c == '&') {
+			pos++;
+			const char *start = pos;
+			for (; pos != end; pos++) {
+				if (*pos == ';')
+					break;
+			}
+			if (pos == end) return false;
+
+			// TODO: &#123; &#xAB; forms
+
+			Interned_String entity_key = intern(&xml->string_table, to_string(start, pos));
+			String entity_value;
+			if (!xml_get_entity(&entity_value, xml, entity_key)) return false;
+			STREAM_COPY_STR(&stream, entity_value);
+		} else {
+			STREAM_COPY(&stream, char, &c);
+		}
+	}
+
+	return false;
+}
+
 inline bool scanner_end(Scanner *s)
 {
 	return s->pos == s->end;
@@ -131,6 +202,16 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 	scanner.pos = data;
 	scanner.end = data + length;
 	Scanner *s = &scanner;
+
+	const XML_Entity default_entities[] = {
+		{ intern(&xml->string_table, c_string("lt")), c_string("<") },
+		{ intern(&xml->string_table, c_string("gt")), c_string(">") },
+		{ intern(&xml->string_table, c_string("amp")), c_string("&") },
+		{ intern(&xml->string_table, c_string("apos")), c_string("'") },
+		{ intern(&xml->string_table, c_string("quot")), c_string("\"") },
+	};
+
+	list_push(&xml->entities, default_entities, Count(default_entities));
 
 	XML_Node *prev = 0;
 	XML_Node *parent = 0;
@@ -179,6 +260,8 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 				new_node->children = 0;
 				new_node->next = 0;
 
+				new_node->text = empty_string();
+
 				if (parent && !parent->children)
 					parent->children = new_node;
 				if (prev) prev->next = new_node;
@@ -195,10 +278,10 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 				}
 			}
 		} else {
-			// TODO: Body
-			while (!accept(s, '<')) {
-				if (scanner_end(s)) return false;
-			}
+			String text;
+			if (!xml_text_until(&text, xml, s, to_string("<", 1)))
+				return false;
+			parent->text = text;
 		}
 	}
 
