@@ -89,16 +89,40 @@ bool is_whitespace(char c)
 	return c == ' ' || c == '\n' || c == '\r' || c == '\t';
 }
 
-inline void accept_whitespace(Scanner *s)
+inline bool accept_whitespace(Scanner *s)
 {
 	const char *end = s->end;
 	const char *pos = s->pos;
 
+reset:
 	while (pos != end && is_whitespace(*pos)) {
 		*pos++;
 	}
+	
+	// Try to match for comment starting <!--
+	if (end - pos >= 4 && *pos == '<' && !memcmp(pos + 1, "!--", 3)) {
+		pos += 4;
+		if (end - pos < 3) {
+			return false;
+		}
+		// The comment must end at least 3 characters before the xml end to fit -->
+		const char *comment_end = end - 3;
+		bool found_end = false;
+		for (; pos != end; pos++) {
+			// Try to match comment ending -->
+			if (*pos == '-' && !memcmp(pos + 1, "->", 2)) {
+				found_end = true;
+				pos += 3;
+				break;
+			}
+		}
+		if (!found_end)
+			return false;
+		goto reset;
+	}
 
 	s->pos = pos;
+	return true;
 }
 
 inline bool accept(Scanner *s, char c)
@@ -225,7 +249,7 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 	XML_Node *parent = 0;
 
 	while (!scanner_end(s)) {
-		accept_whitespace(s);
+		if (!accept_whitespace(s)) return false;
 
 		if (scanner_end(s))
 			break;
@@ -245,15 +269,15 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 					return false;
 				}
 
-				accept_whitespace(s);
+				if (!accept_whitespace(s)) return false;
 
 				Push_Stream attr_stream = start_push_stream(&xml->attribute_alloc);
 
 				String attr_name;
 				while (accept_xml_name(&attr_name, s)) {
-					accept_whitespace(s);
+					if (!accept_whitespace(s)) return false;
 					if (!accept(s, '=')) return false;
-					accept_whitespace(s);
+					if (!accept_whitespace(s)) return false;
 					char quote = accept_any(s, "\"'", 2);
 					if (!quote) return false;
 
@@ -264,7 +288,7 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 					// xml_text_until already matched the ending quote
 					scanner_skip(s, 1);
 
-					accept_whitespace(s);
+					if (!accept_whitespace(s)) return false;
 
 					XML_Attribute *attr = STREAM_ALLOC(&attr_stream, XML_Attribute);
 					attr->key = intern(&xml->string_table, attr_name);
