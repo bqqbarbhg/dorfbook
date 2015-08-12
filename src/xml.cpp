@@ -110,6 +110,16 @@ inline bool accept(Scanner *s, String str)
 	return true;
 }
 
+inline char accept_any(Scanner *s, const char *chars, int char_count)
+{
+	for (int i = 0; i < char_count; i++) {
+		if (accept(s, chars[i])) {
+			return chars[i];
+		}
+	}
+	return '\0';
+}
+
 inline bool scanner_end(Scanner *s)
 {
 	return s->pos == s->end;
@@ -150,9 +160,10 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 					accept_whitespace(s);
 					if (!accept(s, '=')) return false;
 					accept_whitespace(s);
-					if (!accept(s, '"')) return false;
+					char quote = accept_any(s, "\"'", 2);
+					if (!quote) return false;
 					// TODO: Parse
-					while (!accept(s, '"')) {
+					while (!accept(s, quote)) {
 						if (scanner_end(s)) return false;
 					}
 					accept_whitespace(s);
