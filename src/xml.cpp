@@ -5,6 +5,19 @@ struct Scanner
 	const char *end;
 };
 
+inline bool scanner_skip(Scanner *s, size_t amount)
+{
+	if ((size_t)(s->end - s->pos) < amount)
+		return false;
+	s->pos += amount;
+	return true;
+}
+
+inline bool scanner_end(Scanner *s)
+{
+	return s->pos == s->end;
+}
+
 struct XML_Attribute
 {
 	Interned_String key;
@@ -215,17 +228,38 @@ bool xml_text_until(String *text, XML *xml, Scanner *s, String suffix)
 	return false;
 }
 
-inline bool scanner_skip(Scanner *s, size_t amount)
+bool parse_xml_attributes(XML_Attribute **attrs, U32 *attr_count, XML *xml, Scanner *s)
 {
-	if ((size_t)(s->end - s->pos) < amount)
-		return false;
-	s->pos += amount;
-	return true;
-}
+	Push_Stream attr_stream = start_push_stream(&xml->attribute_alloc);
 
-inline bool scanner_end(Scanner *s)
-{
-	return s->pos == s->end;
+	String attr_name;
+	while (accept_xml_name(&attr_name, s)) {
+		if (!accept_whitespace(s)) return false;
+		if (!accept(s, '=')) return false;
+		if (!accept_whitespace(s)) return false;
+		char quote = accept_any(s, "\"'", 2);
+		if (!quote) return false;
+
+		String text;
+		if (!xml_text_until(&text, xml, s, char_string(quote)))
+			return false;
+
+		// xml_text_until already matched the ending quote
+		scanner_skip(s, 1);
+
+		if (!accept_whitespace(s)) return false;
+
+		XML_Attribute *attr = STREAM_ALLOC(&attr_stream, XML_Attribute);
+		attr->key = intern(&xml->string_table, attr_name);
+		attr->value = text;
+	}
+
+	// @Cleanup: This is too low-level code for here
+	Data_Slice attr_data = finish_push_stream(&attr_stream);
+	*attrs = (XML_Attribute*)attr_data.data;
+	*attr_count = (U32)(attr_data.length / sizeof(XML_Attribute));
+
+	return true;
 }
 
 bool parse_xml(XML *xml, const char *data, size_t length)
@@ -271,37 +305,16 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 
 				if (!accept_whitespace(s)) return false;
 
-				Push_Stream attr_stream = start_push_stream(&xml->attribute_alloc);
-
-				String attr_name;
-				while (accept_xml_name(&attr_name, s)) {
-					if (!accept_whitespace(s)) return false;
-					if (!accept(s, '=')) return false;
-					if (!accept_whitespace(s)) return false;
-					char quote = accept_any(s, "\"'", 2);
-					if (!quote) return false;
-
-					String text;
-					if (!xml_text_until(&text, xml, s, char_string(quote)))
-						return false;
-
-					// xml_text_until already matched the ending quote
-					scanner_skip(s, 1);
-
-					if (!accept_whitespace(s)) return false;
-
-					XML_Attribute *attr = STREAM_ALLOC(&attr_stream, XML_Attribute);
-					attr->key = intern(&xml->string_table, attr_name);
-					attr->value = text;
-				}
-
 				XML_Node *new_node = PUSH_ALLOC(&xml->node_alloc, XML_Node);
 				new_node->tag = intern(&xml->string_table, tag_name);
 
-				// @Cleanup: This is too low-level code for here
-				Data_Slice slice = finish_push_stream(&attr_stream);
-				new_node->attributes = (XML_Attribute*)slice.data;
-				new_node->attribute_count = (U32)(slice.length / sizeof(XML_Attribute));
+				XML_Attribute *attrs;
+				U32 attr_count;
+
+				if (!parse_xml_attributes(&attrs, &attr_count, xml, s)) return false;
+
+				new_node->attributes = attrs;
+				new_node->attribute_count = attr_count;
 
 				new_node->parent = parent;
 				new_node->prev = prev;
