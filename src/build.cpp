@@ -11,6 +11,7 @@
 #include "strings.cpp"
 #include "memory.cpp"
 #include "string_table.cpp"
+#include "scanner.cpp"
 #include "xml.cpp"
 #include "gzip/compress_search.cpp"
 #include "gzip/deflate.cpp"
