@@ -81,13 +81,10 @@ inline bool accept_xml_whitespace(Scanner *s)
 {
 	for (;;) {
 		accept_whitespace(s);
-		if (!accept(s, to_string("<!--", 4))) {
+		if (!accept(s, to_string("<!--", 4)))
 			break;
-		}
-		if (!skip_accept(s, to_string("-->", 3))) {
+		if (!skip_accept(s, to_string("-->", 3)))
 			return false;
-		}
-		continue;
 	}
 
 	return true;
