@@ -4,9 +4,20 @@ struct Scanner
 	const char *end;
 };
 
-bool is_whitespace(char c)
+inline bool is_whitespace(char c)
 {
 	return c == ' ' || c == '\n' || c == '\r' || c == '\t';
+}
+
+inline void accept_whitespace(Scanner *s)
+{
+	const char *pos = s->pos;
+	char const *end = s->end;
+
+	while (pos != end && is_whitespace(*pos)) {
+		*pos++;
+	}
+	s->pos = pos;
 }
 
 inline bool scanner_skip(Scanner *s, size_t amount)
@@ -24,6 +35,33 @@ inline bool skip_accept(Scanner *s, char c)
 	for (; pos != end; pos++) {
 		if (*pos == c) {
 			s->pos = pos + 1;
+			return true;
+		}
+	}
+	return false;
+}
+
+inline bool skip_accept(Scanner *s, String str)
+{
+	// The string is invalid
+	if (str.length == 0)
+		return false;
+
+	const char *pos = s->pos;
+	const char *end = s->end;
+
+	// The string doesn't fit into what's left to scan
+	if ((size_t)(end - pos) < str.length)
+		return false;
+
+	char first = str.data[0];
+	for (; pos != end; pos++) {
+		if (*pos != first)
+			continue;
+
+		String suffix = substring(str, 1);
+		if (!memcmp(pos + 1, suffix.data, suffix.length)) {
+			s->pos = pos + str.length;
 			return true;
 		}
 	}

@@ -79,37 +79,17 @@ bool accept_xml_name(String *name, Scanner *s)
 
 inline bool accept_xml_whitespace(Scanner *s)
 {
-	const char *end = s->end;
-	const char *pos = s->pos;
-
-reset:
-	while (pos != end && is_whitespace(*pos)) {
-		*pos++;
-	}
-
-	// Try to match for comment starting <!--
-	if (end - pos >= 4 && *pos == '<' && !memcmp(pos + 1, "!--", 3)) {
-		pos += 4;
-		if (end - pos < 3) {
+	for (;;) {
+		accept_whitespace(s);
+		if (!accept(s, to_string("<!--", 4))) {
+			break;
+		}
+		if (!skip_accept(s, to_string("-->", 3))) {
 			return false;
 		}
-		// The comment must end at least 3 characters before the xml end to fit -->
-		const char *comment_end = end - 3;
-		bool found_end = false;
-		for (; pos != end; pos++) {
-			// Try to match comment ending -->
-			if (*pos == '-' && !memcmp(pos + 1, "->", 2)) {
-				found_end = true;
-				pos += 3;
-				break;
-			}
-		}
-		if (!found_end)
-			return false;
-		goto reset;
+		continue;
 	}
 
-	s->pos = pos;
 	return true;
 }
 
