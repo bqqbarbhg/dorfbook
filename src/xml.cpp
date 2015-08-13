@@ -1,42 +1,3 @@
-
-struct Scanner
-{
-	const char *pos;
-	const char *end;
-};
-
-inline bool scanner_skip(Scanner *s, size_t amount)
-{
-	if ((size_t)(s->end - s->pos) < amount)
-		return false;
-	s->pos += amount;
-	return true;
-}
-
-inline bool skip_accept(Scanner *s, char c)
-{
-	const char *pos = s->pos;
-	const char *end = s->end;
-	for (; pos != end; pos++) {
-		if (*pos == c) {
-			s->pos = pos + 1;
-			return true;
-		}
-	}
-	return false;
-}
-
-char next_char(Scanner *s)
-{
-	assert(s->pos != s->end);
-	return *s->pos++;
-}
-
-inline bool scanner_end(Scanner *s)
-{
-	return s->pos == s->end;
-}
-
 struct XML_Attribute
 {
 	Interned_String key;
@@ -116,12 +77,7 @@ bool accept_xml_name(String *name, Scanner *s)
 	return true;
 }
 
-bool is_whitespace(char c)
-{
-	return c == ' ' || c == '\n' || c == '\r' || c == '\t';
-}
-
-inline bool accept_whitespace(Scanner *s)
+inline bool accept_xml_whitespace(Scanner *s)
 {
 	const char *end = s->end;
 	const char *pos = s->pos;
@@ -154,64 +110,6 @@ reset:
 	}
 
 	s->pos = pos;
-	return true;
-}
-
-inline bool accept(Scanner *s, char c)
-{
-	if (s->pos != s->end && *s->pos == c) {
-		s->pos++;
-		return true;
-	}
-	return false;
-}
-
-inline bool accept(Scanner *s, String str)
-{
-	size_t left = s->end - s->pos;
-	if (left < str.length)
-		return false;
-	if (memcmp(s->pos, str.data, str.length))
-		return false;
-	s->pos += str.length;
-	return true;
-}
-
-inline char accept_any(Scanner *s, const char *chars, int char_count)
-{
-	for (int i = 0; i < char_count; i++) {
-		if (accept(s, chars[i])) {
-			return chars[i];
-		}
-	}
-	return '\0';
-}
-
-inline bool accept_int(U64 *out_value, Scanner *s, int base)
-{
-	U64 value = 0;
-
-	const char *pos = s->pos;
-	const char *end = s->end;
-
-	if (pos == end)
-		return false;
-
-	unsigned digit = char_to_digit_table[*pos];
-	if (digit >= (unsigned)base)
-		return false;
-	value = digit;
-
-	pos++;
-	for (; pos != end; pos++) {
-		digit = char_to_digit_table[*pos];
-		if (digit >= (unsigned)base)
-			break;
-		value = value * base + digit;
-	}
-
-	s->pos = pos;
-	*out_value = value;
 	return true;
 }
 
@@ -290,9 +188,9 @@ bool parse_xml_attributes(XML_Attribute **attrs, U32 *attr_count, XML *xml, Scan
 
 	String attr_name;
 	while (accept_xml_name(&attr_name, s)) {
-		if (!accept_whitespace(s)) return false;
+		if (!accept_xml_whitespace(s)) return false;
 		if (!accept(s, '=')) return false;
-		if (!accept_whitespace(s)) return false;
+		if (!accept_xml_whitespace(s)) return false;
 		char quote = accept_any(s, "\"'", 2);
 		if (!quote) return false;
 
@@ -303,7 +201,7 @@ bool parse_xml_attributes(XML_Attribute **attrs, U32 *attr_count, XML *xml, Scan
 		// xml_text_until already matched the ending quote
 		scanner_skip(s, 1);
 
-		if (!accept_whitespace(s)) return false;
+		if (!accept_xml_whitespace(s)) return false;
 
 		XML_Attribute *attr = STREAM_ALLOC(&attr_stream, XML_Attribute);
 		attr->key = intern(&xml->string_table, attr_name);
@@ -339,7 +237,7 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 	XML_Node *parent = 0;
 
 	while (!scanner_end(s)) {
-		if (!accept_whitespace(s)) return false;
+		if (!accept_xml_whitespace(s)) return false;
 
 		if (scanner_end(s))
 			break;
@@ -359,7 +257,7 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 					return false;
 				}
 
-				if (!accept_whitespace(s)) return false;
+				if (!accept_xml_whitespace(s)) return false;
 
 				XML_Node *new_node = PUSH_ALLOC(&xml->node_alloc, XML_Node);
 				new_node->tag = intern(&xml->string_table, tag_name);
