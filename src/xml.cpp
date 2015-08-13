@@ -98,7 +98,7 @@ reset:
 	while (pos != end && is_whitespace(*pos)) {
 		*pos++;
 	}
-	
+
 	// Try to match for comment starting <!--
 	if (end - pos >= 4 && *pos == '<' && !memcmp(pos + 1, "!--", 3)) {
 		pos += 4;
