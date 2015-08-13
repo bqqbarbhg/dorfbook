@@ -33,3 +33,13 @@ inline String char_string(char c)
 	return to_string((char*)&all_chars_table[(U8)c], 1);
 }
 
+inline String substring(String s, size_t begin)
+{
+	return to_string(s.data + begin, s.length - begin);
+}
+
+inline String substring(String s, size_t begin, size_t length)
+{
+	return to_string(s.data + begin, length);
+}
+

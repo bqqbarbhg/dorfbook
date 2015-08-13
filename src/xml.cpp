@@ -13,6 +13,25 @@ inline bool scanner_skip(Scanner *s, size_t amount)
 	return true;
 }
 
+inline bool skip_accept(Scanner *s, char c)
+{
+	const char *pos = s->pos;
+	const char *end = s->end;
+	for (; pos != end; pos++) {
+		if (*pos == c) {
+			s->pos = pos + 1;
+			return true;
+		}
+	}
+	return false;
+}
+
+char next_char(Scanner *s)
+{
+	assert(s->pos != s->end);
+	return *s->pos++;
+}
+
 inline bool scanner_end(Scanner *s)
 {
 	return s->pos == s->end;
@@ -168,6 +187,34 @@ inline char accept_any(Scanner *s, const char *chars, int char_count)
 	return '\0';
 }
 
+inline bool accept_int(U64 *out_value, Scanner *s, int base)
+{
+	U64 value = 0;
+
+	const char *pos = s->pos;
+	const char *end = s->end;
+
+	if (pos == end)
+		return false;
+
+	unsigned digit = char_to_digit_table[*pos];
+	if (digit >= (unsigned)base)
+		return false;
+	value = digit;
+
+	pos++;
+	for (; pos != end; pos++) {
+		digit = char_to_digit_table[*pos];
+		if (digit >= (unsigned)base)
+			break;
+		value = value * base + digit;
+	}
+
+	s->pos = pos;
+	*out_value = value;
+	return true;
+}
+
 bool xml_get_entity(String *value, XML *xml, Interned_String key)
 {
 	XML_Entity_List entities = xml->entities;
@@ -194,33 +241,42 @@ bool xml_text_until(String *text, XML *xml, Scanner *s, String suffix)
 
 	if ((size_t)(end - pos) < suffix.length)
 		return false;
-	end -= suffix.length;
 
-	for (; pos != end; pos++) {
+	while (!scanner_end(s)) {
 
-		char c = *pos;
-		if (c == suffix_start) {
-			if (!memcmp(pos + 1, suffix.data + 1, suffix.length - 1)) {
-				s->pos = pos;
+		Scanner es = *s;
+		if (accept(&es, suffix_start)) {
+			if (accept(&es, substring(suffix, 1))) {
 				*text = finish_push_stream_string(&stream);
 				return true;
 			}
-		} else if (c == '&') {
-			pos++;
-			const char *start = pos;
-			for (; pos != end; pos++) {
-				if (*pos == ';')
-					break;
+		} else if (accept(s, '&')) {
+
+			if (accept(s, '#')) {
+				int base = 10;
+				if (accept(s, 'x')) {
+					base = 16;
+				}
+				U64 code;
+				if (!accept_int(&code, s, base)) return false;
+				if (!accept(s, ';')) return false;
+
+				// @Unicode(xml)
+				if (code > 0xFF) return false;
+
+				char ch = (char)code;
+				STREAM_COPY(&stream, char, &ch);
+			} else {
+				const char *begin = s->pos;
+				if (!skip_accept(s, ';')) return false;
+
+				Interned_String entity_key = intern(&xml->string_table, to_string(begin, s->pos));
+				String entity_value;
+				if (!xml_get_entity(&entity_value, xml, entity_key)) return false;
+				STREAM_COPY_STR(&stream, entity_value);
 			}
-			if (pos == end) return false;
-
-			// TODO: &#123; &#xAB; forms
-
-			Interned_String entity_key = intern(&xml->string_table, to_string(start, pos));
-			String entity_value;
-			if (!xml_get_entity(&entity_value, xml, entity_key)) return false;
-			STREAM_COPY_STR(&stream, entity_value);
 		} else {
+			char c = next_char(s);
 			STREAM_COPY(&stream, char, &c);
 		}
 	}

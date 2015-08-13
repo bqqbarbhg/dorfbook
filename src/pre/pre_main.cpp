@@ -32,6 +32,7 @@ int main(int argc, char** argv)
 
 	make_crc32_table();
 	make_all_chars_table();
+	make_char_to_digit_table();
 
 	fclose(pre_out);
 	free(path);
