@@ -6,6 +6,10 @@ struct String_Table
 	char **datas;
 	size_t count;
 	size_t size;
+
+#ifdef BUILD_DEBUG
+	void *debug_table_id;
+#endif
 };
 
 void string_table_free(String_Table *table)
@@ -19,6 +23,9 @@ void string_table_free(String_Table *table)
 struct Interned_String
 {
 	String string;
+#ifdef BUILD_DEBUG
+	void *debug_table_id;
+#endif
 };
 
 U32 string_hash(String str)
@@ -60,6 +67,12 @@ void string_table_rehash(String_Table *table)
 	free(old_hashes);
 	free(old_lengths);
 	free(old_datas);
+
+#ifdef BUILD_DEBUG
+	if (!table->debug_table_id) {
+		table->debug_table_id = new_hashes;
+	}
+#endif
 
 	table->hashes = new_hashes;
 	table->lengths = new_lengths;
@@ -116,14 +129,19 @@ String_Table_Position string_table_find(String_Table *table, String str)
 
 Interned_String intern(String_Table *table, String str)
 {
+	if (table->count >= table->size * 3 / 4) {
+		string_table_rehash(table);
+	}
+
+	// Note: This has to be after the rehashing so that interning and empty
+	// string to an empty table has the correct `debug_table_id` set up.
 	if (str.length == 0) {
 		Interned_String empty;
 		empty.string = empty_string();
+#ifdef BUILD_DEBUG
+		empty.debug_table_id = table->debug_table_id;
+#endif
 		return empty;
-	}
-
-	if (table->count >= table->size * 3 / 4) {
-		string_table_rehash(table);
 	}
 
 	String_Table_Position pos = string_table_find(table, str);
@@ -136,5 +154,20 @@ Interned_String intern(String_Table *table, String str)
 	}
 	Interned_String result;
 	result.string = to_string(table->datas[pos.index], table->lengths[pos.index]);
+#ifdef BUILD_DEBUG
+	result.debug_table_id = table->debug_table_id;
+#endif
 	return result;
 }
+
+bool operator==(Interned_String a, Interned_String b) {
+#if BUILD_DEBUG
+	assert(a.debug_table_id == b.debug_table_id);
+#endif
+	return a.string.data == b.string.data;
+}
+
+bool operator!=(Interned_String a, Interned_String b) {
+	return !(a == b);
+}
+

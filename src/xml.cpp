@@ -94,8 +94,7 @@ bool xml_get_entity(String *value, XML *xml, Interned_String key)
 {
 	XML_Entity_List entities = xml->entities;
 	for (size_t i = 0; i < entities.count; i++) {
-		// @Cleanup: This has lots of nested members
-		if (entities.data[i].key.string.data == key.string.data) {
+		if (entities.data[i].key == key) {
 			*value = entities.data[i].value;
 			return true;
 		}
