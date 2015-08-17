@@ -100,10 +100,10 @@ inline void *push_stream_push(Push_Stream *stream, size_t size)
 {
 	Push_Page *page = &stream->allocator->page;
 	if (page->size - page->position < size) {
-		size_t prefix_size = page->size - stream->start;
+		size_t prefix_size = page->position - stream->start;
 		Push_Page *old_page = push_allocator_new_page(stream->allocator, prefix_size + size);
 		if (old_page) {
-			memcpy(page->buffer, old_page->buffer, prefix_size);
+			memcpy(page->buffer, old_page->buffer + stream->start, prefix_size);
 		}
 		page->position = prefix_size;
 		stream->start = 0;

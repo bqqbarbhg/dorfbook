@@ -149,7 +149,7 @@ bool xml_text_until(String *text, XML *xml, Scanner *s, String suffix)
 				if (xml_get_entity(&entity_value, xml, entity_key)) {
 					STREAM_COPY_STR(&stream, entity_value);
 				} else {
-					STREAM_COPY_STR(&stream, to_string(begin, s->pos));
+					STREAM_COPY_STR(&stream, to_string(begin - 1, s->pos));
 				}
 			}
 		} else {
