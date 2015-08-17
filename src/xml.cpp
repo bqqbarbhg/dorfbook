@@ -146,8 +146,11 @@ bool xml_text_until(String *text, XML *xml, Scanner *s, String suffix)
 
 				Interned_String entity_key = intern(&xml->string_table, to_string(begin, s->pos));
 				String entity_value;
-				if (!xml_get_entity(&entity_value, xml, entity_key)) return false;
-				STREAM_COPY_STR(&stream, entity_value);
+				if (xml_get_entity(&entity_value, xml, entity_key)) {
+					STREAM_COPY_STR(&stream, entity_value);
+				} else {
+					STREAM_COPY_STR(&stream, to_string(begin, s->pos));
+				}
 			}
 		} else {
 			char c = next_char(s);
@@ -219,7 +222,13 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 			break;
 
 		if (accept(s, '<')) {
-			if (accept(s, '/')) {
+			if (accept(s, '?')) {
+				if (!skip_accept(s, to_string("?>", 2)))
+					return false;
+			} else if (accept(s, '!')) {
+				if (!balance_accept(s, '<', '>'))
+					return false;
+			} else if (accept(s, '/')) {
 				if (!parent) {
 					return false;
 				}
@@ -273,7 +282,9 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 			String text;
 			if (!xml_text_until(&text, xml, s, to_string("<", 1)))
 				return false;
-			parent->text = text;
+			if (parent) {
+				parent->text = text;
+			}
 		}
 	}
 

@@ -28,6 +28,27 @@ inline bool scanner_skip(Scanner *s, size_t amount)
 	return true;
 }
 
+inline bool balance_accept(Scanner *s, char up, char down, int initial=1)
+{
+	const char *pos = s->pos;
+	const char *end = s->end;
+
+	int level = initial;
+	for (; pos != end; pos++) {
+		char c = *pos;
+		if (c == up) {
+			level++;
+		} else if (c == down) {
+			level--;
+		}
+		if (level == 0) {
+			s->pos = pos + 1;
+			return true;
+		}
+	}
+	return false;
+}
+
 inline bool skip_accept(Scanner *s, char c)
 {
 	const char *pos = s->pos;
