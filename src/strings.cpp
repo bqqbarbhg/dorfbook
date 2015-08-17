@@ -18,6 +18,13 @@ inline String to_string(const char *data, size_t length)
 	return s;
 }
 
+size_t print_string(char *buffer, String str)
+{
+	memcpy(buffer, str.data, str.length);
+	buffer[str.length] = 0;
+	return str.length;
+}
+
 inline String to_string(const char *begin, const char *end)
 {
 	return to_string((char*)begin, (char*)end - (char*)begin);
