@@ -3,6 +3,7 @@ import xml.dom.minidom
 xml_fixtures = [
 	('<root><node arg="value">Content</node><!-- Comment --><empty /></root>', 'Simple XML'),
 	("<other><inner arg='thing' second='woo' /></other>", 'Single quote arguments'),
+	('<root attr="&quot;">&#65; thing &amp; &#x61;ther</root>', 'Predefined entities'),
 ]
 
 class Dorf_XML_Node:

@@ -144,7 +144,7 @@ bool xml_text_until(String *text, XML *xml, Scanner *s, String suffix)
 				const char *begin = s->pos;
 				if (!skip_accept(s, ';')) return false;
 
-				Interned_String entity_key = intern(&xml->string_table, to_string(begin, s->pos));
+				Interned_String entity_key = intern(&xml->string_table, to_string(begin, s->pos - 1));
 				String entity_value;
 				if (xml_get_entity(&entity_value, xml, entity_key)) {
 					STREAM_COPY_STR(&stream, entity_value);
