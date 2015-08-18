@@ -49,6 +49,9 @@ def parse_dorf_xml(data):
 def py_children(py):
 	return filter(lambda x: x.nodeType == xml.dom.Node.ELEMENT_NODE, py.childNodes)
 
+def py_content(py):
+	return filter(lambda x: x.nodeType == xml.dom.Node.TEXT_NODE, py.childNodes)[0].data
+
 def xml_match(py, dorf, desc):
 	ctx = desc + ', Node <%s> #%d' % (dorf.tag, dorf.tag_id + 1)
 	t.check(py.tagName == dorf.tag, "Tag matches", ctx)
@@ -56,6 +59,9 @@ def xml_match(py, dorf, desc):
 		for index, at in enumerate(dorf.attributes):
 			val = py.attributes[at[0]].value
 			t.check(val == at[1], "Attribute matches", ctx + ", attribute %d" % (index + 1))
+	if dorf.content:
+		content = py_content(py)
+		t.check(content == dorf.content, "Content matches", ctx)
 	children = py_children(py)
 	if t.check(len(children) == len(dorf.children), "Correct number of children", ctx):
 		for p,d in zip(children, dorf.children):
