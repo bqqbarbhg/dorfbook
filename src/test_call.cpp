@@ -50,12 +50,25 @@ size_t write_xml(char *buffer, XML_Node *node)
 
 size_t test_xml(char *out_buffer, const char* in_buffer, size_t length)
 {
+	// Copy the input to a mutable buffer for making sure that the XML doesn't
+	// hold any references to the input buffer.
+	char *read_buffer = (char*)malloc(length);
+	memcpy(read_buffer, in_buffer, length);
+
 	XML xml = { 0 };
-	if (!parse_xml(&xml, in_buffer, length))
+	if (!parse_xml(&xml, read_buffer, length))
 		return 0;
+
+	// Overwrite the buffer with a detectable bit pattern to catch errors
+	memset(read_buffer, 0xD0, length);
+
 	if (!xml.root)
 		return 0;
-	return write_xml(out_buffer, xml.root);
+	size_t written = write_xml(out_buffer, xml.root);
+
+	free(read_buffer);
+
+	return written;
 }
 
 Test_Def test_defs[] = {
