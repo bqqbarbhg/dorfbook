@@ -66,6 +66,7 @@ size_t test_xml(char *out_buffer, const char* in_buffer, size_t length)
 		return 0;
 	size_t written = write_xml(out_buffer, xml.root);
 
+	xml_free(&xml);
 	free(read_buffer);
 
 	return written;

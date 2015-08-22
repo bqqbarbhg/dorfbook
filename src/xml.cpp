@@ -43,6 +43,7 @@ void xml_free(XML *xml)
 {
 	push_allocator_free(&xml->attribute_alloc);
 	push_allocator_free(&xml->node_alloc);
+	push_allocator_free(&xml->text_alloc);
 	string_table_free(&xml->string_table);
 }
 
