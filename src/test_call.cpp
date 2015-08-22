@@ -71,11 +71,48 @@ size_t test_xml(char *out_buffer, const char* in_buffer, size_t length)
 	return written;
 }
 
+size_t test_utf8_decode(char *out_buffer, const char* in_buffer, size_t length)
+{
+	const char *ptr = in_buffer;
+	const char *end = ptr + length;
+	char *out_ptr = out_buffer;
+	while (ptr != end) {
+		Utf_Result result = utf8_decode(ptr, end - ptr);
+		if (!result.end) {
+			return 0;
+		}
+		ptr = result.end;
+		out_ptr += sprintf(out_ptr, "%u ", result.codepoint);
+	}
+	return out_ptr - out_buffer;
+}
+
+size_t test_utf8_encode(char *out_buffer, const char* in_buffer, size_t length)
+{
+	Scanner s;
+	s.pos = in_buffer;
+	s.end = in_buffer + length;
+
+	char *out_ptr = out_buffer;
+	char *out_end = out_ptr + TEST_BUFFER_SIZE;
+
+	U64 value;
+	while (accept_int(&value, &s, 10)) {
+		accept_whitespace(&s);
+
+		out_ptr += utf8_encode(out_ptr, out_end - out_ptr, (U32)value);
+	}
+
+	return out_ptr - out_buffer;
+}
+
 Test_Def test_defs[] = {
 	"crc32", test_crc32,
 	"gzip", test_gzip,
 	"identity", test_identity,
 	"xml", test_xml,
+	"utf8_decode", test_utf8_decode,
+	"utf8_encode", test_utf8_encode,
 };
 
 size_t test_call(const char *name, char *out_buffer,

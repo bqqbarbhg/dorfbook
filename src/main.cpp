@@ -506,6 +506,8 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 			char *in_buffer = (char*)malloc(TEST_BUFFER_SIZE);
 			char *out_buffer = (char*)malloc(TEST_BUFFER_SIZE);
 
+			buffer_limit(&buffer, TEST_BUFFER_SIZE);
+
 			// TODO: This is bad.
 			buffer_read_amount(&buffer, in_buffer, content_length);
 

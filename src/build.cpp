@@ -9,6 +9,7 @@
 
 #include "../gen/pre_output.cpp"
 #include "strings.cpp"
+#include "utf.cpp"
 #include "memory.cpp"
 #include "string_table.cpp"
 #include "scanner.cpp"
