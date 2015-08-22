@@ -11,7 +11,7 @@ set LDFlags= -opt:ref user32.lib gdi32.lib shell32.lib ws2_32.lib
 
 cl %CLFlags% ../src/pre/pre_build.cpp -link %LDFlags% -out:pre_dorfbook.exe
 pre_dorfbook.exe ../gen/
-cl %CLFlags% ../src/build.cpp -link %LDFlags% -out:dorfbook.exe
+cl %CLFlags% ../src/build.cpp -DBUILD_DEBUG -link %LDFlags% -out:dorfbook.exe
 
 xcopy /qy ..\data data >NUL
 cd ..

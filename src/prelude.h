@@ -5,8 +5,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 #include <math.h>
 #include <time.h>
+typedef int8_t I8;
+typedef uint8_t U8;
 typedef int32_t I32;
 typedef uint32_t U32;
 typedef int64_t I64;
