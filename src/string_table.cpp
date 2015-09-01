@@ -160,6 +160,19 @@ Interned_String intern(String_Table *table, String str)
 	return result;
 }
 
+bool intern_if_not_new(Interned_String *result, String_Table *table, String str)
+{
+	String_Table_Position pos = string_table_find(table, str);
+	if (!pos.exists)
+		return false;
+
+	result->string = to_string(table->datas[pos.index], table->lengths[pos.index]);
+#ifdef BUILD_DEBUG
+	result->debug_table_id = table->debug_table_id;
+#endif
+	return true;
+}
+
 bool operator==(Interned_String a, Interned_String b) {
 #if BUILD_DEBUG
 	assert(a.debug_table_id == b.debug_table_id);
