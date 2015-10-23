@@ -295,7 +295,22 @@ int render_allocation(char *body, U64 serial)
 		Debug_Alloc_Header new_header;
 
 		if (debug_alloc_get_serial(header.next_serial, &new_header)) {
-			ptr += sprintf(ptr, "<h3>Reallocated as %s[%d] (%.2fkB)</h3>",
+			ptr += sprintf(ptr, "<h3>Reallocated as <a href=\"/allocations/%llu\">%s[%d] (%.2fkB)</a></h3>",
+					new_header.serial,
+					new_header.type,
+					new_header.size / new_header.type_size,
+					(double)new_header.size / 1000.0f);
+		} else {
+			ptr += sprintf(ptr, "<h3>Reallocated</h3>");
+		}
+	}
+
+	if (header.prev_serial) {
+		Debug_Alloc_Header new_header;
+
+		if (debug_alloc_get_serial(header.prev_serial, &new_header)) {
+			ptr += sprintf(ptr, "<h3>Reallocated from <a href=\"/allocations/%llu\">%s[%d] (%.2fkB)</a></h3>",
+					new_header.serial,
 					new_header.type,
 					new_header.size / new_header.type_size,
 					(double)new_header.size / 1000.0f);

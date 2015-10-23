@@ -332,14 +332,14 @@ void *debug_reallocate(void *ptr, size_t size, const char *type, size_t type_siz
 		g_debug_memory.root.next->prev = new_header;
 	g_debug_memory.root.next = new_header;
 
-	Debug_Alloc_Header *old_logged = unsafe_debug_alloc_get_serial(old_serial);
-	if (old_logged) {
-		old_logged->next_serial = new_header->serial;
-	}
-
 	if (g_debug_memory.log) {
 		g_debug_memory.log_index = (g_debug_memory.log_index + 1) % g_debug_memory.log_size;
 		g_debug_memory.log[g_debug_memory.log_index] = *new_header;
+	}
+
+	Debug_Alloc_Header *old_logged = unsafe_debug_alloc_get_serial(old_serial);
+	if (old_logged) {
+		old_logged->next_serial = new_header->serial;
 	}
 
 #ifdef BREAK_AT_SERIAL
