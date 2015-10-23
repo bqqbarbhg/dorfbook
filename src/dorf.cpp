@@ -54,6 +54,7 @@ struct World
 	Location locations[64];
 	Post posts[128];
 	U32 post_index;
+	Assets *assets;
 
 	Random_Series random_series;
 };
@@ -263,9 +264,30 @@ int render_entity_avatar(World *world, U32 id, char *buffer)
 	}
 
 	ptr += sprintf(ptr, "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\""
-		" width=\"100\" height=\"100\">\n");
-	ptr += sprintf(ptr, "<circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"#%06x\" />\n",
-			dwarf->seed & 0xFFFFFF);
+		" width=\"60\" height=\"60\" overflow=\"hidden\">\n");
+
+	Printer p;
+	p.pos = ptr;
+	p.end = ptr + 10000;
+
+	Random_Series series = series_from_seed32(dwarf->seed);
+
+	const char *parts[] = {
+		"base", "beard", "eyes",
+	};
+
+	for (size_t i = 0; i < Count(parts); i++) {
+		char name[64];
+
+		sprintf(name, "face-%s%02d", parts[i], 1 + next(&series, 3));
+		XML_Node *node = svg_find_by_id(&world->assets->faces, c_string(name));
+
+		if (!print_xml(&p, node))
+			return 500;
+	}
+
+	ptr = p.pos;
+
 	ptr += sprintf(ptr, "</svg>\n");
 
 	return 200;

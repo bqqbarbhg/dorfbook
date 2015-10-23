@@ -28,6 +28,13 @@ U32 next32(Random_Series *series)
 	return s.w;
 }
 
+U32 next(Random_Series *series, U32 limit)
+{
+	// Note: This is slightly-nonuniform
+	U32 value = next32(series);
+	return value % limit;
+}
+
 // Returns true with the chance of 1 out of `inverse`
 // eg. next_one_in(series, 4) returns true 25% of the time.
 bool next_one_in(Random_Series *series, U32 inverse)

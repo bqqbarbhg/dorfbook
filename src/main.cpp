@@ -804,6 +804,22 @@ int main(int argc, char **argv)
 		dwarf->seed = next32(&world.random_series);
 	}
 
+	Assets assets = { 0 };
+	static char face_xml_data[1024*1024];
+
+	FILE *face_xml_file = fopen("data/faces.svg", "r");
+	size_t num_bytes = fread(face_xml_data, 1, sizeof(face_xml_data), face_xml_file);
+
+	if (!parse_xml(&assets.faces.xml, face_xml_data, num_bytes)) {
+		puts("Failed to parse face SVG");
+	}
+
+	fclose(face_xml_file);
+
+	initialize_id_list(&assets.faces);
+
+	world.assets = &assets;
+
 	World_Instance world_instance = { 0 };
 	world_instance.last_updated = time(NULL);
 	world_instance.world = &world;

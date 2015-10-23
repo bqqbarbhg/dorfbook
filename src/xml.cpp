@@ -292,3 +292,38 @@ bool parse_xml(XML *xml, const char *data, size_t length)
 	return true;
 }
 
+bool print_xml(Printer *p, XML_Node *node)
+{
+	bool success;
+
+	success =
+		print(p, '<') &&
+		print(p, node->tag);
+	if (!success) return false;
+
+	for (U32 i = 0; i < node->attribute_count; i++) {
+		XML_Attribute attr = node->attributes[i];
+		success =
+			print(p, ' ') &&
+			print(p, attr.key) &&
+			print(p, "=\"") &&
+			print(p, attr.value) &&
+			print(p, '"');
+		if (!success) return false;
+	}
+
+	if (!print(p, '>')) return false;
+
+	for (XML_Node *child = node->children; child; child = child->next) {
+		if (!print_xml(p, child)) return false;
+	}
+
+	success =
+		print(p, "</") &&
+		print(p, node->tag) &&
+		print(p, '>');
+	if (!success) return false;
+
+	return true;
+}
+
