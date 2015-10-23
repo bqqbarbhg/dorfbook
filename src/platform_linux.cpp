@@ -8,8 +8,11 @@
 #include <pthread.h>
 #include <errno.h>
 #include <netinet/tcp.h>
+#include <execinfo.h>
 
 typedef timespec os_timer_mark;
+
+char *os_linux_executable_name;
 
 os_timer_mark os_get_timer()
 {
@@ -136,10 +139,115 @@ inline os_thread os_thread_do(os_thread_func func, void *param)
 	return result;
 }
 
-inline void os_startup()
+inline void os_startup(int argc, char **argv)
 {
+	os_linux_executable_name = argv[0];
 }
 
 inline void os_cleanup()
 {
 }
+
+inline void os_debug_break()
+{
+	__builtin_trap();
+}
+
+typedef pthread_t os_thread_id;
+
+inline os_thread_id os_current_thread_id()
+{
+	return pthread_self();
+}
+
+inline bool os_thread_id_equal(os_thread_id a, os_thread_id b)
+{
+	return pthread_equal(a, b) != 0;
+}
+
+int os_capture_stack_trace(void **trace, int count)
+{
+	return backtrace(trace, count);
+}
+
+#ifdef BUILD_DEBUG
+
+bool os_linux_parse_addr2line(os_symbol_info_writer *w, int i, FILE *input)
+{
+	char line[512];
+
+	if (!fgets(line, sizeof(line), input))
+		return false;
+
+	int function_len = (int)strlen(line) - 1;
+	if (function_len > 0 && line[0] != '?') {
+		if (!os_symbol_writer_set_function(w, i, line, function_len))
+			return false;
+	}
+
+	if (!fgets(line, sizeof(line), input))
+		return false;
+
+	char *filename_end = strchr(line, ':');
+	if (!filename_end) return false;
+
+	int filename_len = (int)(filename_end - line);
+	if (filename_len > 0 && line[0] != '?') {
+
+		int lineno;
+		if (sscanf(filename_end + 1, "%d", &lineno) != 1)
+			return false;
+
+		if (!os_symbol_writer_set_location(w, i, line, filename_len, lineno))
+			return false;
+	}
+
+	return true;
+}
+
+os_symbol_info *os_get_address_infos(void **addresses, int count)
+{
+	os_symbol_info_writer w;
+	os_symbol_writer_begin(&w, count);
+
+	char command[2048];
+	char *ptr = command, *end = command + sizeof(command);
+
+	ptr += snprintf(ptr, end - ptr, "addr2line -Cfe \"%s\"", os_linux_executable_name);
+	if (end - ptr < 1) return 0;
+
+	for (int i = 0; i < count; i++) {
+		ptr += snprintf(ptr, end - ptr, " %llx", (unsigned long long)addresses[i]);
+		if (end - ptr < 1) return 0;
+	}
+
+	FILE *input = popen(command, "r");
+	if (!input)
+		return 0;
+
+	for (int i = 0; i < count; i++) {
+		if (!os_linux_parse_addr2line(&w, i, input)) {
+			pclose(input);
+			return 0;
+		}
+	}
+
+	pclose(input);
+
+	return os_symbol_writer_finish(&w);
+}
+
+#else
+
+os_symbol_info *os_get_address_infos(void **addresses, int count)
+{
+	return 0;
+}
+
+#endif
+
+void os_free_address_infos(os_symbol_info* infos)
+{
+	free(infos);
+}
+

@@ -30,13 +30,13 @@ inline Push_Page *push_allocator_new_page(Push_Allocator *allocator, size_t size
 
 	Push_Page *old_page = 0;
 	if (allocator->page.size > 0) {
-		old_page = (Push_Page*)malloc(sizeof(Push_Page));
+		old_page = M_ALLOC(Push_Page, 1);
 		*old_page = allocator->page;
 	}
 
 	Push_Page *new_page = &allocator->page;
 	new_page->previous = old_page;
-	new_page->buffer = (char*)malloc(new_size);
+	new_page->buffer = M_ALLOC(char, new_size);
 	new_page->position = 0;
 	new_page->size = new_size;
 
@@ -63,13 +63,13 @@ inline void *push_allocator_copy(Push_Allocator *allocator, size_t size, void *s
 
 void push_allocator_free(Push_Allocator *allocator)
 {
-	free(allocator->page.buffer);
+	M_FREE(allocator->page.buffer);
 
 	Push_Page *page = allocator->page.previous;
 	while (page) {
 		Push_Page *prev_page = page->previous;
-		free(page->buffer);
-		free(page);
+		M_FREE(page->buffer);
+		M_FREE(page);
 		page = prev_page;
 	}
 }
@@ -139,7 +139,7 @@ inline void *push_stream_copy(Push_Stream *stream, size_t size, void *src)
 #define LIST_STRUCT(type) struct type##_List { type *data; size_t count, capacity; }; \
 	void list_realloc(type##_List *list, size_t size) { \
 		size_t new_capacity = max(size, list->capacity * 2); \
-		list->data = (type*)realloc(list->data, new_capacity * sizeof(type)); \
+		list->data = M_REALLOC(list->data, type, new_capacity); \
 		list->capacity = new_capacity; \
 	} \
 	type* list_push(type##_List *list, size_t count=1) { \
@@ -153,5 +153,5 @@ inline void *push_stream_copy(Push_Stream *stream, size_t size, void *src)
 		memcpy(dst, data, count * sizeof(type)); \
 		return dst; \
 	} \
-	void list_free(type##_List *list) { free(list->data); }
+	void list_free(type##_List *list) { M_FREE(list->data); }
 

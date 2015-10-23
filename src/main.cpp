@@ -203,6 +203,143 @@ int render_stats(Server_Stats *stats, char *body)
 	return 200;
 }
 
+int render_heap(char *body)
+{
+	char *ptr = body;
+
+#if BUILD_DEBUG
+
+	ptr += sprintf(ptr, "<html><head><title>Server heap</title></head><body>");
+	ptr += sprintf(ptr, "<table>");
+
+	Debug_Alloc_Header *header = debug_alloc_lock_heap();
+	for (; header; header = header->next) {
+		ptr += sprintf(ptr, "<a href=\"allocations/%llu\">", header->serial);
+		ptr += sprintf(ptr, "<tr><td>%s:%d</td>"
+				"<td><a href=\"allocations/%llu\"><pre>%s[%d]</pre></a></td>"
+				"<td>%.2fkB</td></tr>",
+				header->alloc_loc.file,
+				header->alloc_loc.line,
+				header->serial,
+				header->type,
+				(U32)header->size / (U32)header->type_size,
+				(double)header->size / 1000.0);
+	}
+
+	debug_alloc_unlock_heap();
+
+	ptr += sprintf(ptr, "</table>");
+	ptr += sprintf(ptr, "</body></html>");
+
+	return 200;
+#else
+	return 404;
+#endif
+}
+
+int render_allocations(char *body)
+{
+	char *ptr = body;
+
+#if BUILD_DEBUG
+
+	ptr += sprintf(ptr, "<html><head><title>Server allocations</title></head><body>");
+	ptr += sprintf(ptr, "<table>");
+
+	Debug_Alloc_Header header;
+
+	U64 serial = g_debug_memory.serial;
+	for (; debug_alloc_get_serial(serial, &header); serial--) {
+
+		ptr += sprintf(ptr, "<a href=\"allocations/%llu\">", header.serial);
+		ptr += sprintf(ptr, "<tr><td>%s:%d</td>"
+				"<td><a href=\"allocations/%llu\"><pre>%s[%d]</pre></a></td>"
+				"<td>%.2fkB</td></tr>",
+				header.alloc_loc.file,
+				header.alloc_loc.line,
+				header.serial,
+				header.type,
+				(U32)header.size / (U32)header.type_size,
+				(double)header.size / 1000.0);
+	}
+
+
+	ptr += sprintf(ptr, "</table>");
+	ptr += sprintf(ptr, "</body></html>");
+
+	return 200;
+#else
+	return 404;
+#endif
+}
+
+int render_allocation(char *body, U64 serial)
+{
+	char *ptr = body;
+
+#if BUILD_DEBUG
+
+	Debug_Alloc_Header header;
+	if (!debug_alloc_get_serial(serial, &header)) {
+		return 404;
+	}
+
+	ptr += sprintf(ptr, "<html><head><title>Server allocations</title></head><body>");
+
+	ptr += sprintf(ptr, "<h2>%s[%d] (%.2fkB)</h2>",
+			header.type,
+			header.size / header.type_size,
+			(double)header.size / 1000.0f);
+
+	if (header.next_serial) {
+		Debug_Alloc_Header new_header;
+
+		if (debug_alloc_get_serial(header.next_serial, &new_header)) {
+			ptr += sprintf(ptr, "<h3>Reallocated as %s[%d] (%.2fkB)</h3>",
+					new_header.type,
+					new_header.size / new_header.type_size,
+					(double)new_header.size / 1000.0f);
+		} else {
+			ptr += sprintf(ptr, "<h3>Reallocated</h3>");
+		}
+	}
+
+	if (header.alloc_trace_length) {
+		os_symbol_info *symbols = os_get_address_infos(header.alloc_trace, (int)header.alloc_trace_length);
+		if (symbols) {
+			ptr += sprintf(ptr, "<h4>Allocation trace</h4><table>\n");
+			for (U32 i = 0; i < header.alloc_trace_length; i++) {
+				if (!symbols[i].filename || !symbols[i].function)
+					continue;
+				ptr += sprintf(ptr, "<tr><td>%s:%d</td><td>%s</td></tr>\n",
+					symbols[i].filename, symbols[i].line, symbols[i].function);
+			}
+			ptr += sprintf(ptr, "</table>\n");
+		}
+	}
+
+	if (header.free_trace_length) {
+		os_symbol_info *symbols = os_get_address_infos(header.free_trace, (int)header.free_trace_length);
+		if (symbols) {
+			ptr += sprintf(ptr, "<h4>Free trace</h4><table>\n");
+			for (U32 i = 0; i < header.free_trace_length; i++) {
+				if (!symbols[i].filename || !symbols[i].function)
+					continue;
+				ptr += sprintf(ptr, "<tr><td>%s:%d</td><td>%s</td></tr>\n",
+					symbols[i].filename, symbols[i].line, symbols[i].function);
+			}
+			ptr += sprintf(ptr, "</table>\n");
+		}
+	}
+
+	ptr += sprintf(ptr, "</body></html>");
+
+	return 200;
+#else
+	return 404;
+#endif
+}
+
 struct Response_Thread_Data
 {
 	os_socket client_socket;
@@ -231,7 +368,7 @@ Socket_Buffer buffer_new(os_socket socket, int size=1024)
 {
 	Socket_Buffer buffer = { 0 };
 	buffer.socket = socket;
-	buffer.data = (char*)malloc(size);
+	buffer.data = M_ALLOC(char, size);
 	buffer.data_size = size;
 	return buffer;
 }
@@ -244,7 +381,7 @@ void buffer_limit(Socket_Buffer *buffer, int bytes)
 // NOTE: Does not free the socket
 void buffer_free(Socket_Buffer *buffer)
 {
-	free(buffer->data);
+	M_FREE(buffer->data);
 }
 
 bool buffer_fill_read(Socket_Buffer *buffer)
@@ -340,7 +477,7 @@ int buffer_read_amount(Socket_Buffer *buffer, char *data, int length)
 }
 
 void send_response(os_socket socket, const char *content_type, int status,
-	const char *body, size_t body_length)
+	const char *body, size_t body_length, String *extra_headers, U32 extra_header_count)
 {
 	const char *status_desc = get_http_status_description(status);
 	char response_start[128];
@@ -355,8 +492,21 @@ void send_response(os_socket socket, const char *content_type, int status,
 	os_socket_send(socket, response_start, (int)strlen(response_start));
 	os_socket_send(socket, content_length_header, (int)strlen(content_length_header));
 	os_socket_send(socket, content_type_header, (int)strlen(content_type_header));
+
+	for (U32 i = 0; i < extra_header_count; i++) {
+		String header = extra_headers[i];
+		os_socket_send(socket, header.data, (int)header.length);
+		os_socket_send(socket, separator, (int)strlen(separator));
+	}
+
 	os_socket_send(socket, separator, (int)strlen(separator));
 	os_socket_send_and_flush(socket, body, (int)body_length);
+}
+
+void send_response(os_socket socket, const char *content_type, int status,
+	const char *body, size_t body_length)
+{
+	send_response(socket, content_type, status, body, body_length, 0, 0);
 }
 
 void send_text_response(os_socket socket, const char *content_type, int status,
@@ -407,6 +557,7 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 			break;
 
 		U32 id;
+		U64 serial;
 		char test_name[128];
 		if (!strcmp(path, "/favicon.ico")) {
 			FILE *icon = fopen("data/icon.ico", "rb");
@@ -501,24 +652,51 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 
 			send_text_response(client_socket, "text/html", status, body);
 
+		} else if (!strcmp(path, "/heap")) {
+
+			int status = render_heap(body);
+
+			send_text_response(client_socket, "text/html", status, body);
+
+		} else if (sscanf(path, "/allocations/%llu", &serial) == 1) {
+
+			int status = render_allocation(body, serial);
+
+			send_text_response(client_socket, "text/html", status, body);
+
+		} else if (!strcmp(path, "/allocations")) {
+
+			int status = render_allocations(body);
+
+			send_text_response(client_socket, "text/html", status, body);
+
 		} else if (sscanf(path, "/test/%s", test_name) == 1) {
 
-			char *in_buffer = (char*)malloc(TEST_BUFFER_SIZE);
-			char *out_buffer = (char*)malloc(TEST_BUFFER_SIZE);
+			char *in_buffer = M_ALLOC(char, TEST_BUFFER_SIZE);
+			char *out_buffer = M_ALLOC(char, TEST_BUFFER_SIZE);
 
 			buffer_limit(&buffer, TEST_BUFFER_SIZE);
 
 			// TODO: This is bad.
 			buffer_read_amount(&buffer, in_buffer, content_length);
 
+			size_t leak_amount;
 			size_t out_length = test_call(test_name, out_buffer,
-				in_buffer, content_length);
+				in_buffer, content_length, &leak_amount);
+
+			char leak_header[128];
+			size_t len = sprintf(leak_header, "X-Memory-Leak: %d", (int)leak_amount);
+
+			String extra_headers[] = {
+				to_string(leak_header, len),
+			};
 
 			send_response(client_socket, "application/octet-stream", 200,
-				out_buffer, out_length);
+				out_buffer, out_length,
+				extra_headers, Count(extra_headers));
 
-			free(in_buffer);
-			free(out_buffer);
+			M_FREE(in_buffer);
+			M_FREE(out_buffer);
 
 		} else if (!strcmp(path, "/")) {
 			const char *body = "<html><body><h1>Hello world!</h1></body></html>";
@@ -536,8 +714,8 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 	os_socket_close(client_socket);
 
 	buffer_free(&buffer);
-	free(body);
-	free(thread_data);
+	M_FREE(body);
+	M_FREE(thread_data);
 
 	os_atomic_decrement(&active_thread_count);
 
@@ -547,7 +725,11 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 int main(int argc, char **argv)
 {
 
-	os_startup();
+	os_startup(argc, argv);
+
+#if BUILD_DEBUG
+	debug_alloc_init();
+#endif
 
 	static char err_buffer[128];
 
@@ -555,7 +737,7 @@ int main(int argc, char **argv)
 	signal(SIGTERM, handle_kill);
 
 	global_stats.snapshot_count = 100;
-	global_stats.active_thread_counts = (long*)calloc(global_stats.snapshot_count, sizeof(long));
+	global_stats.active_thread_counts = M_ALLOC_ZERO(long, global_stats.snapshot_count);
 	os_mutex_init(&global_stats.lock);
 
 	struct addrinfo *addr = NULL;
@@ -645,10 +827,10 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		Response_Thread_Data *thread_data = (Response_Thread_Data*)malloc(sizeof(Response_Thread_Data));
+		Response_Thread_Data *thread_data = M_ALLOC(Response_Thread_Data, 1);
 		thread_data->client_socket = client_socket;
 		thread_data->world_instance = &world_instance;
-		thread_data->body_storage = (char*)malloc(1024*1024);
+		thread_data->body_storage = M_ALLOC(char, 1024*1024);
 		thread_data->thread_id = ++thread_id;
 
 #if 1

@@ -52,7 +52,7 @@ size_t test_xml(char *out_buffer, const char* in_buffer, size_t length)
 {
 	// Copy the input to a mutable buffer for making sure that the XML doesn't
 	// hold any references to the input buffer.
-	char *read_buffer = (char*)malloc(length);
+	char *read_buffer = M_ALLOC(char, length);
 	memcpy(read_buffer, in_buffer, length);
 
 	XML xml = { 0 };
@@ -67,7 +67,7 @@ size_t test_xml(char *out_buffer, const char* in_buffer, size_t length)
 	size_t written = write_xml(out_buffer, xml.root);
 
 	xml_free(&xml);
-	free(read_buffer);
+	M_FREE(read_buffer);
 
 	return written;
 }
@@ -117,13 +117,39 @@ Test_Def test_defs[] = {
 };
 
 size_t test_call(const char *name, char *out_buffer,
-	const char *in_buffer, size_t in_length)
+	const char *in_buffer, size_t in_length, size_t *leak_amount)
 {
 	for (int i = 0; i < Count(test_defs); i++) {
 		if (strcmp(test_defs[i].name, name))
 			continue;
 
+#if BUILD_DEBUG
+		Debug_Alloc_Snapshot *begin = debug_thread_memory_snapshot();
+#endif
+
 		size_t size = test_defs[i].func(out_buffer, in_buffer, in_length);
+
+#if BUILD_DEBUG
+		Debug_Alloc_Snapshot *end = debug_thread_memory_snapshot();
+		Debug_Alloc_Snapshot *leaked = debug_snapshot_new_allocations(begin, end);
+
+		if (leak_amount) {
+			if (leaked) {
+				size_t amount = 0;
+				for (Debug_Alloc_Snapshot *alloc = leaked; alloc; alloc = alloc->next) {
+					amount += (size_t)alloc->header.size;
+				}
+				*leak_amount = amount;
+			} else {
+				*leak_amount = 0;
+			}
+		}
+
+		debug_alloc_snapshot_free(begin);
+		debug_alloc_snapshot_free(end);
+		debug_alloc_snapshot_free(leaked);
+#endif
+
 		return size;
 	}
 	return 0;

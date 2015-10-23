@@ -7,7 +7,7 @@ mkdir data 2>NUL
 
 set IgnoreWarn= -wd4100 -wd4101 -wd4189 -wd4706
 set CLFlags= -MT -nologo -Od -W4 -WX -Zi %IgnoreWarn% -D_CRT_SECURE_NO_WARNINGS
-set LDFlags= -opt:ref user32.lib gdi32.lib shell32.lib ws2_32.lib
+set LDFlags= -opt:ref user32.lib gdi32.lib shell32.lib ws2_32.lib DbgHelp.lib
 
 cl %CLFlags% ../src/pre/pre_build.cpp -link %LDFlags% -out:pre_dorfbook.exe
 pre_dorfbook.exe ../gen/

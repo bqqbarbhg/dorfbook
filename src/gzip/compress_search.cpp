@@ -149,7 +149,7 @@ int live_chain_compare(const void *a, const void *b)
 // Returns the amount of the used space of the `chain_data` buffer.
 unsigned chain_data_gc(Search_Chain *chains, unsigned chain_count, uint16_t *chain_data, unsigned chain_data_count, int pos)
 {
-	Live_Chain *live_chains = (Live_Chain*)malloc(sizeof(Live_Chain) * chain_count);
+	Live_Chain *live_chains = M_ALLOC(Live_Chain, chain_count);
 	unsigned live_chain_count = 0;
 
 	int drop_at = pos - SEARCH_MAX_DIST;
@@ -237,8 +237,8 @@ void init_search_context(Search_Context *context, const void *data, int length)
 	context->data = (const char*)data;
 	context->length = length;
 
-	context->chains = (Search_Chain*)malloc(SEARCH_CHAIN_COUNT * sizeof(Search_Chain));
-	context->chain_data = (uint16_t*)malloc(SEARCH_DATA_COUNT * sizeof(uint16_t));
+	context->chains = M_ALLOC(Search_Chain, SEARCH_CHAIN_COUNT);
+	context->chain_data = M_ALLOC(uint16_t, SEARCH_DATA_COUNT);
 
 	// TODO: Free list optimization (less GC)
 
@@ -484,7 +484,7 @@ int search_next_matches(Search_Context *context, Search_Match *matches, int max_
 
 void free_search_context(Search_Context *context)
 {
-	free(context->chains);
-	free(context->chain_data);
+	M_FREE(context->chains);
+	M_FREE(context->chain_data);
 }
 

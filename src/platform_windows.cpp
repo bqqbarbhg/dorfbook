@@ -4,6 +4,10 @@
 #include <ws2tcpip.h>
 #include <Windows.h>
 
+#ifdef BUILD_DEBUG
+#include <DbgHelp.h>
+#endif
+
 typedef LARGE_INTEGER os_timer_mark;
 LARGE_INTEGER os_windows_performance_counter_freq;
 
@@ -128,15 +132,100 @@ inline os_thread os_thread_do(os_thread_func func, void *param)
 	result.handle = CreateThread(NULL, NULL, func, param, NULL, &result.id);
 	return result;
 }
-inline void os_startup()
+inline void os_startup(int argc, char **argv)
 {
 	WSADATA wsadata;
 	WSAStartup(0x0202, &wsadata);
 
 	QueryPerformanceFrequency(&os_windows_performance_counter_freq);
+
+#ifdef BUILD_DEBUG
+	SymSetOptions(SYMOPT_LOAD_LINES);
+	SymInitialize(GetCurrentProcess(), NULL, TRUE);
+#endif
 }
 
 inline void os_cleanup()
 {
 	WSACleanup();
 }
+
+inline void os_debug_break()
+{
+	DebugBreak();
+}
+
+typedef DWORD os_thread_id;
+
+inline os_thread_id os_current_thread_id()
+{
+	return GetCurrentThreadId();
+}
+
+inline bool os_thread_id_equal(os_thread_id a, os_thread_id b)
+{
+	return a == b;
+}
+
+int os_capture_stack_trace(void **trace, int count)
+{
+	return CaptureStackBackTrace(0, count, trace, NULL);
+}
+
+#ifdef BUILD_DEBUG
+
+struct os_windows_symbol_info
+{
+	SYMBOL_INFO info;
+	CHAR buffer[512];
+};
+
+os_symbol_info *os_get_address_infos(void **addresses, int count)
+{
+	HANDLE process = GetCurrentProcess();
+
+	os_symbol_info_writer w;
+	if (!os_symbol_writer_begin(&w, count))
+		return 0;
+
+	for (int i = 0; i < count; i++) {
+
+		void *address = addresses[i];
+		IMAGEHLP_LINE64 line = { sizeof(line) };
+		DWORD displacement;
+		if (SymGetLineFromAddr64(process, (DWORD64)address, &displacement, &line)) {
+
+			if (!os_symbol_writer_set_location(&w, i, line.FileName, (int)strlen(line.FileName), line.LineNumber))
+				return false;
+
+		}
+
+		os_windows_symbol_info symbol_info;
+		symbol_info.info.SizeOfStruct = sizeof(symbol_info.info);
+		symbol_info.info.MaxNameLen = Count(symbol_info.buffer);
+		DWORD64 displacement64;
+		if (SymFromAddr(process, (DWORD64)address, &displacement64, &symbol_info.info)) {
+
+			if (!os_symbol_writer_set_function(&w, i, symbol_info.info.Name, (int)symbol_info.info.NameLen))
+				return false;
+
+		}
+	}
+
+	return os_symbol_writer_finish(&w);
+}
+
+#else
+
+os_symbol_info *os_get_address_infos(void **addresses, int count)
+{
+	return 0;
+}
+
+#endif
+
+void os_free_address_infos(os_symbol_info* infos)
+{
+	free(infos);
+}
+

@@ -1,6 +1,7 @@
 
 #include "prelude.h"
 
+#include "platform_shared.cpp"
 #ifdef _WIN32
 #include "platform_windows.cpp"
 #else
@@ -8,6 +9,8 @@
 #endif
 
 #include "../gen/pre_output.cpp"
+#include "source_loc.cpp"
+#include "debug_alloc.cpp"
 #include "strings.cpp"
 #include "utf.cpp"
 #include "memory.cpp"

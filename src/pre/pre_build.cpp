@@ -1,4 +1,6 @@
 #include "../prelude.h"
+#include "../source_loc.cpp"
+#include "../debug_alloc.cpp"
 #include "pre_util.cpp"
 #include "pre_deflate.cpp"
 #include "pre_string.cpp"

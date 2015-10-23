@@ -25,7 +25,11 @@ if not binary:
 	sys.exit(-1)
 
 def test_call(func, buf):
+	global t
 	r = requests.post('http://127.0.0.1:3500/test/' + func, buf)
+	leaked = int(r.headers.get('x-memory-leak', '0'))
+	extra = '%d bytes leaked' % leaked
+	t.check(leaked == 0, '/test/%s does not leak memory' % func, extra)
 	return r.content
 
 print 'Starting server'

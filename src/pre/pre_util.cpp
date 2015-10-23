@@ -1,19 +1,6 @@
 
 FILE *pre_out;
 
-struct Source_Loc
-{
-	const char *file;
-	U32 line;
-};
-Source_Loc make_source_loc(const char *file, U32 line)
-{
-	Source_Loc loc = { file, line };
-	return loc;
-}
-
-#define SOURCE_LOC make_source_loc(__FILE__, __LINE__)
-
 void pre_create_loc_comment(Source_Loc loc)
 {
 	fprintf(pre_out, "// Generated from %s:%d\n", loc.file, loc.line);

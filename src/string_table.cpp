@@ -15,9 +15,9 @@ struct String_Table
 void string_table_free(String_Table *table)
 {
 	push_allocator_free(&table->alloc);
-	free(table->hashes);
-	free(table->lengths);
-	free(table->datas);
+	M_FREE(table->hashes);
+	M_FREE(table->lengths);
+	M_FREE(table->datas);
 }
 
 struct Interned_String
@@ -50,9 +50,9 @@ void string_table_rehash(String_Table *table)
 	char **old_datas = table->datas;
 
 	// TODO: Compound allocation?
-	U32 *new_hashes = (U32*)calloc(sizeof(U32), new_size);
-	U32 *new_lengths = (U32*)calloc(sizeof(U32), new_size);
-	char **new_datas = (char**)calloc(sizeof(char *), new_size);
+	U32 *new_hashes = M_ALLOC_ZERO(U32, new_size);
+	U32 *new_lengths = M_ALLOC_ZERO(U32, new_size);
+	char **new_datas = M_ALLOC_ZERO(char*, new_size);
 
 	for (size_t old_index = 0; old_index < old_size; old_index++) {
 		size_t new_index = old_hashes[old_index] % new_size;
@@ -64,9 +64,9 @@ void string_table_rehash(String_Table *table)
 		new_datas[new_index] = old_datas[old_index];
 	}
 
-	free(old_hashes);
-	free(old_lengths);
-	free(old_datas);
+	M_FREE(old_hashes);
+	M_FREE(old_lengths);
+	M_FREE(old_datas);
 
 #ifdef BUILD_DEBUG
 	if (!table->debug_table_id) {
@@ -83,9 +83,9 @@ void string_table_rehash(String_Table *table)
 void free_string_table(String_Table *table)
 {
 	push_allocator_free(&table->alloc);
-	free(table->hashes);
-	free(table->lengths);
-	free(table->datas);
+	M_FREE(table->hashes);
+	M_FREE(table->lengths);
+	M_FREE(table->datas);
 }
 
 struct String_Table_Position

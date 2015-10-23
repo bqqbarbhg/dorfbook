@@ -4,7 +4,7 @@ char *combine_path(const char *root, const char *path)
 	size_t root_len = strlen(root);
 	size_t path_len = strlen(path);
 
-	char *result_buffer = (char*)malloc(root_len + path_len + 2);
+	char *result_buffer = M_ALLOC(char, root_len + path_len + 2);
 	char *result_ptr = result_buffer;
 
 	memcpy(result_ptr, root, root_len);
