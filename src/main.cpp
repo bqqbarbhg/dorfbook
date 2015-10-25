@@ -762,16 +762,25 @@ int main(int argc, char **argv)
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;
 
-	getaddrinfo(NULL, DORF_PORT, &hints, &addr);
+	const char *port = DORF_PORT;
+
+	// TODO: Real flags
+	if (argc > 1) {
+		port = argv[1];
+	}
+
+	getaddrinfo(NULL, port, &hints, &addr);
 
 	server_socket = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 	if (bind(server_socket, addr->ai_addr, (int)addr->ai_addrlen)) {
 		os_socket_format_last_error(err_buffer, sizeof(err_buffer));
 		printf("Failed to bind socket: %s\n", err_buffer);
+		return 1;
 	}
 	if (listen(server_socket, SOMAXCONN)) {
 		os_socket_format_last_error(err_buffer, sizeof(err_buffer));
 		printf("Failed to bind socket: %s\n", err_buffer);
+		return 1;
 	}
 
 	freeaddrinfo(addr);
@@ -781,7 +790,7 @@ int main(int argc, char **argv)
 		"Bohir",
 	};
 
-	puts("Dorfbook serving at port " DORF_PORT);
+	printf("Dorfbook serving at port %s\n", port);
 	puts("Enter ^C to stop");
 
 	char name_buf[512], *name_ptr = name_buf;
