@@ -165,10 +165,9 @@ inline bool os_thread_id_equal(os_thread_id a, os_thread_id b)
 	return pthread_equal(a, b) != 0;
 }
 
-int os_capture_stack_trace(void **trace, int count)
-{
-	return backtrace(trace, count);
-}
+// Macro so the function doesn't get included in the trace
+#define os_capture_stack_trace(trace, count) \
+	backtrace((trace), (count))
 
 #ifdef BUILD_DEBUG
 
