@@ -71,7 +71,7 @@ bool parse_rule_token(Rule_Token *token, Scanner *s)
 	const char *start = s->pos;
 	const char *pos = s->pos;
 	const char *end = s->end;
-	
+
 	if (pos == end)
 		return false;
 
@@ -230,7 +230,7 @@ bool parse_rules_inner(Sim_Info *sim_info, Push_Allocator *ta, Scanner *s)
 	U32 tag_info_count = pl_count(tag_infos);
 	sim_info->tag_infos = PUSH_COPY_N(allocator, Tag_Info, tag_info_count, tag_infos);
 	sim_info->tag_info_count = tag_info_count;
-	
+
 	return true;
 }
 
