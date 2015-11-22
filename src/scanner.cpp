@@ -62,6 +62,30 @@ inline bool skip_accept(Scanner *s, char c)
 	return false;
 }
 
+inline bool scanner_accept_line(Scanner* out_line, Scanner *s)
+{
+	if (s->pos == s->end)
+		return false;
+
+	out_line->pos = s->pos;
+
+	const char *pos = s->pos;
+	const char *end = s->end;
+	for (; pos != end; pos++) {
+		if (*pos == '\r' || *pos == '\n') {
+			break;
+		}
+	}
+
+	out_line->end = pos;
+	if (pos != end && *pos == '\r') pos++;
+	if (pos != end && *pos == '\n') pos++;
+
+	s->pos = pos;
+
+	return false;
+}
+
 inline bool skip_accept(Scanner *s, String str)
 {
 	// The string is invalid
@@ -156,5 +180,10 @@ inline bool accept_int(U64 *out_value, Scanner *s, int base)
 	s->pos = pos;
 	*out_value = value;
 	return true;
+}
+
+inline String to_string(Scanner scanner)
+{
+	return to_string(scanner.pos, scanner.end);
 }
 
