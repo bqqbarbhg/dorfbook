@@ -83,7 +83,7 @@ inline bool scanner_accept_line(Scanner* out_line, Scanner *s)
 
 	s->pos = pos;
 
-	return false;
+	return true;
 }
 
 inline bool skip_accept(Scanner *s, String str)

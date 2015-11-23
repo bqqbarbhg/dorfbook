@@ -107,6 +107,63 @@ size_t test_utf8_encode(char *out_buffer, const char* in_buffer, size_t length)
 	return out_ptr - out_buffer;
 }
 
+size_t test_sim_parse(char *out_buffer, const char* in_buffer, size_t length)
+{
+	Scanner s;
+	s.pos = in_buffer;
+	s.end = in_buffer + length;
+
+	Sim_Info sim_info = { 0 };
+	bool ret = parse_rules(&sim_info, &s);
+
+	if (!ret) {
+		return sprintf(out_buffer, "0\n");
+	}
+
+	char *ptr = out_buffer;
+
+	ptr += sprintf(ptr, "1\n%d\n", sim_info.rule_count);
+
+	for (U32 rule_index = 0; rule_index < sim_info.rule_count; rule_index++) {
+		Rule *rule = sim_info.rules + rule_index;
+
+		ptr += print_string(ptr, rule->name);
+		ptr += sprintf(ptr, "\n");
+		ptr += print_string(ptr, rule->description);
+		ptr += sprintf(ptr, "\n");
+		ptr += sprintf(ptr, "%d\n", rule->bind_count);
+
+		for (U32 bind_index = 0; bind_index < rule->bind_count; bind_index++) {
+			Bind *bind = rule->binds + bind_index;
+
+			ptr += print_string(ptr, bind->name.string);
+			ptr += sprintf(ptr, "\n");
+
+			Tag_Query *queries[2] = { &bind->pre, &bind->post };
+			for (U32 query_index = 0; query_index < 2; query_index++) {
+				Tag_Query *query = queries[query_index];
+
+				for (U32 i = 0; i < query->required_tag_count; i++) {
+					Tag_Info *tag_info = &sim_info.tag_infos[query->required_tags[i]];
+					ptr += print_string(ptr, tag_info->name.string);
+					ptr += sprintf(ptr, " ");
+				}
+				ptr += sprintf(ptr, "\n");
+				for (U32 i = 0; i < query->prohibited_tag_count; i++) {
+					Tag_Info *tag_info = &sim_info.tag_infos[query->prohibited_tags[i]];
+					ptr += print_string(ptr, tag_info->name.string);
+					ptr += sprintf(ptr, " ");
+				}
+				ptr += sprintf(ptr, "\n");
+			}
+		}
+	}
+
+	sim_info_free(&sim_info);
+
+	return ptr - out_buffer;
+}
+
 Test_Def test_defs[] = {
 	"crc32", test_crc32,
 	"gzip", test_gzip,
@@ -114,6 +171,7 @@ Test_Def test_defs[] = {
 	"xml", test_xml,
 	"utf8_decode", test_utf8_decode,
 	"utf8_encode", test_utf8_encode,
+	"sim_parse", test_sim_parse,
 };
 
 size_t test_call(const char *name, char *out_buffer,

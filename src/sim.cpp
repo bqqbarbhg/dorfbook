@@ -68,7 +68,6 @@ Bind *rule_find_bind(Rule *rule, Interned_String bind_id)
 
 bool parse_rule_token(Rule_Token *token, Scanner *s)
 {
-	const char *start = s->pos;
 	const char *pos = s->pos;
 	const char *end = s->end;
 
@@ -83,6 +82,8 @@ bool parse_rule_token(Rule_Token *token, Scanner *s)
 		token->prefix = '\0';
 	}
 
+	const char *start = pos;
+
 	for (; pos != end; pos++) {
 		char c = *pos;
 		if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
@@ -94,6 +95,7 @@ bool parse_rule_token(Rule_Token *token, Scanner *s)
 	if (identifier.length == 0)
 		return false;
 
+	s->pos = pos;
 	token->identifier = identifier;
 	return true;
 }
@@ -129,7 +131,7 @@ bool parse_rules_inner(Sim_Info *sim_info, Push_Allocator *ta, Scanner *s)
 			accept_whitespace(&line);
 			rule->description = PUSH_COPY_STR(allocator, to_string(line));
 
-		} else if (accept(&line, c_string("    "))) {
+		} else if (accept(&line, c_string("    ")) || accept(&line, '\t')) {
 			if (!rule) return false;
 			accept_whitespace(&line);
 
@@ -141,9 +143,10 @@ bool parse_rules_inner(Sim_Info *sim_info, Push_Allocator *ta, Scanner *s)
 			Rule_Token rule_tokens[64];
 			U32 rule_token_count = 0;
 
-			while (parse_rule_token(rule_tokens + rule_token_count, &line)) {
-				accept_whitespace(&line);
+			while (!scanner_end(&line)) {
+				if (!parse_rule_token(rule_tokens + rule_token_count, &line)) return false;
 				if (++rule_token_count == Count(rule_tokens)) return false;
+				accept_whitespace(&line);
 			}
 
 			if (rule_token_count < 2)
@@ -163,20 +166,21 @@ bool parse_rules_inner(Sim_Info *sim_info, Push_Allocator *ta, Scanner *s)
 				if (!bind) {
 					Bind zero_bind = { 0 };
 					bind = pl_push_copy(ta, rule->binds, zero_bind);
+					bind->name = bind_id;
 					rule->bind_count++;
 				}
 
-				for (U32 i = 1; i < rule_token_count; i++) {
-					Rule_Token *token = rule_tokens + i;
+				for (U32 token_index = 1; token_index < rule_token_count; token_index++) {
+					Rule_Token *token = rule_tokens + token_index;
 
 					Interned_String tag_name = intern(string_table, token->identifier);
 
 					Tag_Id tag_id = 0;
 
 					U32 tag_info_count = pl_count(tag_infos);
-					for (U32 j = 1; j < tag_info_count; j++) {
+					for (U32 i = 1; i < tag_info_count; i++) {
 						if (tag_infos[i].name == tag_name) {
-							tag_id = j;
+							tag_id = i;
 							break;
 						}
 					}

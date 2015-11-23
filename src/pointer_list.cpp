@@ -49,6 +49,7 @@ Pointer_List_Header *pointer_list_reserve(Push_Allocator *alloc, void **list, U3
 		U32 size = sizeof(Pointer_List_Header) + capacity * element_size;
 		Pointer_List_Header* new_header = (Pointer_List_Header*)PUSH_ALLOC_N(alloc, char, size);
 
+		new_header->magic = POINTER_LIST_HEADER_MAGIC;
 		new_header->count = 0;
 		new_header->capacity = capacity;
 
@@ -61,7 +62,7 @@ void pointer_list_push_n(Push_Allocator *alloc, void **list, U32 element_size, U
 {
 	U32 new_count = pointer_list_count(*list) + count;
 	Pointer_List_Header *header = pointer_list_reserve(alloc, list, element_size, new_count);
-	header->count += new_count;
+	header->count = new_count;
 }
 
 #define pl_count(list) ( pointer_list_count(list) )
