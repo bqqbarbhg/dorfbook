@@ -9,6 +9,7 @@ import subprocess
 import signal
 from bs4 import BeautifulSoup
 from StringIO import StringIO
+import json
 
 def flush_write(text):
 	sys.stdout.write(text)

@@ -166,28 +166,26 @@ None,
 
 for data, fixture, desc in sim_parse_fixtures:
 	try:
-		parsed = test_call("sim_parse", data)
-		lines = iter(parsed.splitlines())
-
-		fail_extra = "Should succeed" if bool(data) else "Should fault"
-		t.check(bool(fixture) == bool(int(next(lines))), "Parses as expected", desc)
+		parsed = json.loads(test_call("sim_parse", data))
+		t.check(bool(fixture) == bool(parsed), "Parses as expected", desc)
 
 		if not fixture:
 			continue
 
+		parsed_rules = parsed['rules']
+
 		rules = fixture['rules']
-		if t.check(len(rules) == int(next(lines)), "Parsed expected number of rules", desc):
-			for rule in rules:
-				t.check(rule['title'] == next(lines), "Parsed title", desc)
-				t.check(rule['description'] == next(lines), "Parsed description", desc)
-				bind_count = int(next(lines))
-				parsed_binds = { }
-				for i in range(bind_count):
-					bind_id = next(lines)
-					parsed_tags = tuple(set(next(lines).split()) for ln in range(4))
-					parsed_binds[bind_id] = parsed_tags
+		if t.check(len(rules) == len(parsed_rules), "Parsed expected number of rules", desc):
+			for rule, parsed_rule in zip(rules, parsed_rules):
+				t.check(rule['title'] == parsed_rule['title'], "Parsed title", desc)
+				t.check(rule['description'] == parsed_rule['description'], "Parsed description", desc)
 
 				binds = { k: tuple(set(t.split()) for t in v) for k,v in rule['binds'].items() }
+
+				parsed_binds = { }
+				for bind_id, parsed_bind in parsed_rule['binds'].items():
+					parsed_tags = tuple(set(parsed_bind[key]) for key in ('required', 'prohibited', 'adds', 'removes'))
+					parsed_binds[bind_id] = parsed_tags
 
 				t.check(parsed_binds == binds, "Parsed binds", desc)
 	except StopIteration:

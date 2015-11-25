@@ -18,6 +18,7 @@
 #include "string_table.cpp"
 #include "scanner.cpp"
 #include "printer.cpp"
+#include "json_writer.cpp"
 #include "xml.cpp"
 #include "svg.cpp"
 #include "gzip/compress_search.cpp"
