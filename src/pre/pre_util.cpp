@@ -10,7 +10,7 @@ void pre_create_array_u8(const char *name, U8 *values, U32 count, Source_Loc loc
 {
 	pre_create_loc_comment(loc);
 
-	fprintf(pre_out, "uint8_t %s[%u] = {\n", name, count);
+	fprintf(pre_out, "const uint8_t %s[%u] = {\n", name, count);
 	U32 index = 0;
 	while (index < count) {
 		fprintf(pre_out, "\t");
@@ -27,7 +27,7 @@ void pre_create_array_u32(const char *name, U32 *values, U32 count, Source_Loc l
 {
 	pre_create_loc_comment(loc);
 
-	fprintf(pre_out, "uint32_t %s[%u] = {\n", name, count);
+	fprintf(pre_out, "const uint32_t %s[%u] = {\n", name, count);
 	U32 index = 0;
 	while (index < count) {
 		fprintf(pre_out, "\t");
