@@ -6,6 +6,7 @@ script:
   - ./build.sh
   - ./test.py
 after_script:
+  - cat gen/pre_output.cpp
   - cat bin/test_out.log
   - cat bin/test_err.log
 notifications:
