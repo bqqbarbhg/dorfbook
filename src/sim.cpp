@@ -1,21 +1,42 @@
 
 typedef U32 Tag_Id;
 
-struct Tag_Query
+struct Tag_List
 {
-	Tag_Id *required_tags;
-	Tag_Id *prohibited_tags;
+	Tag_Id *tags;
+	U32 count;
+};
 
-	U32 required_tag_count;
-	U32 prohibited_tag_count;
+struct Tags_State
+{
+	Tag_List included;
+	Tag_List excluded;
 };
 
 struct Bind
 {
 	Interned_String name;
+};
 
-	Tag_Query pre;
-	Tag_Query post;
+struct Rel_State
+{
+	U32 first_bind_id;
+	U32 second_bind_id;
+
+	Tags_State tags;
+};
+
+struct Rule_State
+{
+	Tags_State *bind_states;
+
+	Rel_State *rel_states;
+	U32 rel_state_count;
+};
+
+struct Tag_Info
+{
+	Interned_String name;
 };
 
 struct Rule
@@ -25,17 +46,9 @@ struct Rule
 
 	Bind *binds;
 	U32 bind_count;
-};
 
-struct Rule_Token
-{
-	char prefix;
-	String identifier;
-};
-
-struct Tag_Info
-{
-	Interned_String name;
+	Rule_State pre_state;
+	Rule_State post_state;
 };
 
 struct Sim_Info
@@ -65,6 +78,13 @@ Bind *rule_find_bind(Rule *rule, Interned_String bind_id)
 	}
 	return 0;
 }
+
+struct Rule_Token
+{
+	char prefix;
+	String identifier;
+};
+
 
 bool parse_rule_token(Rule_Token *token, Scanner *s)
 {
@@ -98,6 +118,53 @@ bool parse_rule_token(Rule_Token *token, Scanner *s)
 	s->pos = pos;
 	token->identifier = identifier;
 	return true;
+}
+
+void finalize_tags_state(Sim_Info *sim_info, Tags_State *state)
+{
+	state->included.count = pl_count(state->included.tags);
+	state->included.tags = PUSH_COPY_N(&sim_info->allocator, Tag_Id,
+			state->included.count, state->included.tags);
+
+	state->excluded.count = pl_count(state->excluded.tags);
+	state->excluded.tags = PUSH_COPY_N(&sim_info->allocator, Tag_Id,
+			state->excluded.count, state->excluded.tags);
+}
+
+Bind *find_or_create_bind(Push_Allocator *ta, Rule *rule, Interned_String name)
+{
+	Bind *old_bind = rule_find_bind(rule, name);
+	if (old_bind) return old_bind;
+
+	Bind zero_bind = { 0 };
+	Bind *bind = pl_push_copy(ta, rule->binds, zero_bind);
+	bind->name = name;
+
+	Tags_State zero_state = { 0 };
+	pl_push_copy(ta, rule->pre_state.bind_states, zero_state);
+	pl_push_copy(ta, rule->post_state.bind_states, zero_state);
+
+	rule->bind_count++;
+
+	return bind;
+}
+
+Tag_Id find_or_create_tag(Push_Allocator *ta, Tag_Info **tag_infos, Interned_String name)
+{
+	Tag_Info *infos = *tag_infos;
+
+	U32 tag_info_count = pl_count(infos);
+	for (U32 i = 1; i < tag_info_count; i++) {
+		if (infos[i].name == name) {
+			return i;
+		}
+	}
+
+	Tag_Info *new_tag = pl_push(ta, infos);
+	new_tag->name = name;
+
+	*tag_infos = infos;
+	return tag_info_count;
 }
 
 bool parse_rules_inner(Sim_Info *sim_info, Push_Allocator *ta, Scanner *s)
@@ -150,52 +217,79 @@ bool parse_rules_inner(Sim_Info *sim_info, Push_Allocator *ta, Scanner *s)
 			}
 
 			if (rule_token_count < 2)
-				return true;
+				return false;
 
 			if (rule_tokens[0].prefix)
 				return false;
 
-			Interned_String bind_id = intern(string_table, rule_tokens[0].identifier);
+			Rule_State *current_state = in_post_rule_section ? &rule->post_state : &rule->pre_state;
 
 			if (!rule_tokens[rule_token_count - 1].prefix) {
 				// Relation
+
+				if (rule_token_count < 3)
+					return false;
+
+				Rel_State zero_rel = { 0 };
+
+				Interned_String first_name = intern(string_table, rule_tokens[0].identifier);
+				Bind *first = find_or_create_bind(ta, rule, first_name);
+				U32 first_index = (U32)(first - rule->binds);
+
+				Interned_String second_name = intern(string_table, rule_tokens[rule_token_count - 1].identifier);
+				Bind *second = find_or_create_bind(ta, rule, second_name);
+				U32 second_index = (U32)(second - rule->binds);
+
+				Rel_State *rel_state = 0;
+
+				U32 rel_state_count = current_state->rel_state_count;
+				for (U32 rel_index = 0; rel_index < rel_state_count; rel_index++) {
+					Rel_State *rel = current_state->rel_states + rel_index;
+					if (rel->first_bind_id == first_index && rel->second_bind_id == second_index) {
+						rel_state = rel;
+						break;
+					}
+				}
+
+				if (!rel_state) {
+					Rel_State rel = { 0 };
+					rel.first_bind_id = first_index;
+					rel.second_bind_id = second_index;
+
+					rel_state = pl_push_copy(ta, current_state->rel_states, rel);
+					current_state->rel_state_count++;
+				}
+
+				for (U32 token_index = 1; token_index < rule_token_count - 1; token_index++) {
+					Rule_Token *token = rule_tokens + token_index;
+
+					Interned_String tag_name = intern(string_table, token->identifier);
+					Tag_Id tag_id = find_or_create_tag(ta, &tag_infos, tag_name);
+
+					switch (token->prefix) {
+					case '+': pl_push_copy(ta, rel_state->tags.included.tags, tag_id); break;
+					case '-': pl_push_copy(ta, rel_state->tags.excluded.tags, tag_id); break;
+					default: return false;
+					}
+				}
+
 			} else {
 				// Just tags
 
-				Bind *bind = rule_find_bind(rule, bind_id);
-				if (!bind) {
-					Bind zero_bind = { 0 };
-					bind = pl_push_copy(ta, rule->binds, zero_bind);
-					bind->name = bind_id;
-					rule->bind_count++;
-				}
+				Interned_String bind_name = intern(string_table, rule_tokens[0].identifier);
+				Bind *bind = find_or_create_bind(ta, rule, bind_name);
+				size_t bind_index = bind - rule->binds;
+				Tags_State *tags = current_state->bind_states + bind_index;
 
 				for (U32 token_index = 1; token_index < rule_token_count; token_index++) {
 					Rule_Token *token = rule_tokens + token_index;
 
 					Interned_String tag_name = intern(string_table, token->identifier);
-
-					Tag_Id tag_id = 0;
-
-					U32 tag_info_count = pl_count(tag_infos);
-					for (U32 i = 1; i < tag_info_count; i++) {
-						if (tag_infos[i].name == tag_name) {
-							tag_id = i;
-							break;
-						}
-					}
-
-					if (tag_id == 0) {
-						Tag_Info *new_tag = pl_push(ta, tag_infos);
-						new_tag->name = tag_name;
-						tag_id = tag_info_count;
-					}
-
-					Tag_Query *query = in_post_rule_section ? &bind->post : &bind->pre;
+					Tag_Id tag_id = find_or_create_tag(ta, &tag_infos, tag_name);
 
 					switch (token->prefix) {
-					case '+': pl_push_copy(ta, query->required_tags, tag_id); break;
-					case '-': pl_push_copy(ta, query->prohibited_tags, tag_id); break;
+					case '+': pl_push_copy(ta, tags->included.tags, tag_id); break;
+					case '-': pl_push_copy(ta, tags->excluded.tags, tag_id); break;
 					default: return false;
 					}
 				}
@@ -209,19 +303,25 @@ bool parse_rules_inner(Sim_Info *sim_info, Push_Allocator *ta, Scanner *s)
 		Rule *rule = rules + rule_index;
 
 		U32 bind_count = pl_count(rule->binds);
-		for (U32 bind_index = 0; bind_index < bind_count; bind_index++) {
-			Bind *bind = rule->binds + bind_index;
+		rule->bind_count = bind_count;
 
-			Tag_Query *queries[] = { &bind->pre, &bind->post };
-			for (U32 query_index = 0; query_index < Count(queries); query_index++) {
-				Tag_Query *query = queries[query_index];
+		Rule_State *states[] = { &rule->pre_state, &rule->post_state };
+		for (U32 state_index = 0; state_index < 2; state_index++) {
+			Rule_State *state = states[state_index];
 
-				query->required_tag_count = pl_count(query->required_tags);
-				query->required_tags = PUSH_COPY_N(allocator, Tag_Id, query->required_tag_count, query->required_tags);
-
-				query->prohibited_tag_count = pl_count(query->prohibited_tags);
-				query->prohibited_tags = PUSH_COPY_N(allocator, Tag_Id, query->prohibited_tag_count, query->prohibited_tags);
+			for (U32 bind_index = 0; bind_index < bind_count; bind_index++) {
+				finalize_tags_state(sim_info, &state->bind_states[bind_index]);
 			}
+
+			state->bind_states = PUSH_COPY_N(allocator, Tags_State, bind_count, state->bind_states);
+
+			U32 rel_state_count = pl_count(state->rel_states);
+			for (U32 rel_index = 0; rel_index < rel_state_count; rel_index++) {
+				finalize_tags_state(sim_info, &state->rel_states[rel_index].tags);
+			}
+
+			state->rel_state_count = rel_state_count;
+			state->rel_states = PUSH_COPY_N(allocator, Rel_State, state->rel_state_count, state->rel_states);
 		}
 
 		rule->binds = PUSH_COPY_N(allocator, Bind, bind_count, rule->binds);

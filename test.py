@@ -33,6 +33,14 @@ def test_call(func, buf):
 	t.check(leaked == 0, '/test/%s does not leak memory' % func, extra)
 	return r.content
 
+def read_file_string(path):
+	with open(path, 'r') as fl:
+		return fl.read()
+
+def read_file_json(path):
+	with open(path, 'r') as fl:
+		return json.load(fl)
+
 print 'Starting server'
 
 # TODO: Support opening on some free port, communicate port to tests

@@ -1,0 +1,32 @@
+{
+  "rules": [
+    {
+      "title": "Thing near other",
+      "description": "{thing} near {other}",
+      "binds": {
+        "thing": {
+          "pre": { "included": ["thing_tag"], "excluded": [] },
+          "post": { "included": [], "excluded": [] }
+        },
+        "other": {
+          "pre": { "included": ["other_tag"], "excluded": [] },
+          "post": { "included": [], "excluded": [] }
+        }
+      },
+      "rels": {
+        "pre": [
+          {
+            "binds": ["thing", "other"],
+            "tags": { "included": ["near"], "excluded": ["far"] }
+          }
+        ],
+        "post": [
+          {
+            "binds": ["thing", "other"],
+            "tags": { "included": ["yes"], "excluded": ["no"] }
+          }
+        ]
+      }
+    }
+  ]
+}

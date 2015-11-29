@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "title": "Thing and other",
+      "description": "{thing} does {other}",
+      "binds": {
+        "thing": {
+          "pre": { "included": ["thing"], "excluded": ["nothing"] },
+          "post": { "included": ["adds"], "excluded": ["removes"] }
+        },
+        "other": {
+          "pre": { "included": ["othing", "many"], "excluded": ["nother", "woo"] },
+          "post": { "included": ["yes", "also"], "excluded": ["no", "nope"] }
+        }
+      },
+      "rels": { "pre": [], "post": [] }
+    }
+  ]
+}

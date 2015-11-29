@@ -1,0 +1,46 @@
+{
+  "rules": [
+    {
+      "title": "First rule",
+      "description": "first desc",
+      "binds": {
+        "first_entity": {
+          "pre": { "included": ["first_yes"], "excluded": ["first_no"] },
+          "post": { "included": ["first_add"], "excluded": ["first_remove"] }
+        },
+        "shared_entity": {
+          "pre": { "included": ["first_yes"], "excluded": ["first_no"] },
+          "post": { "included": ["first_add"], "excluded": ["first_remove"] }
+        }
+      },
+      "rels": { "pre": [], "post": [] }
+    },
+    {
+      "title": "Second rule",
+      "description": "second desc",
+      "binds": {
+        "second_entity": {
+          "pre": { "included": ["second_yes"], "excluded": ["second_no"] },
+          "post": { "included": ["second_add"], "excluded": ["second_remove"] }
+        },
+        "shared_entity": {
+          "pre": { "included": ["second_yes"], "excluded": ["second_no"] },
+          "post": { "included": ["second_add"], "excluded": ["second_remove"] }
+        }
+      },
+      "rels": { "pre": [], "post": [] }
+    },
+    {
+      "title": "Third rule",
+      "description": "third desc",
+      "binds": {},
+      "rels": { "pre": [], "post": [] }
+    },
+    {
+      "title": "Fourth rule",
+      "description": "fourth desc",
+      "binds": {},
+      "rels": { "pre": [], "post": [] }
+    }
+  ]
+}

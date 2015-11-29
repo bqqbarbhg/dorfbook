@@ -1,0 +1,65 @@
+{
+  "rules": [
+    {
+      "title": "Three objects",
+      "description": "{a}, {b} and {c}",
+      "binds": {
+        "a": {
+          "pre": {
+            "included": ["a_pos"],
+            "excluded": ["a_neg"]
+          },
+          "post": {
+            "included": ["a_add"],
+            "excluded": ["a_remove"]
+          }
+        },
+        "b": {
+          "pre": {
+            "included": ["b_pos"],
+            "excluded": ["b_neg"]
+          },
+          "post": { "included": [], "excluded": [] }
+        },
+        "c": {
+          "pre": { "included": [], "excluded": [] },
+          "post": {
+            "included": ["c_add"],
+            "excluded": ["c_remove"]
+          }
+        }
+      },
+      "rels": {
+        "pre": [
+          {
+            "binds": ["a", "b"],
+            "tags": {
+              "included": ["ab_pos", "ab_pos_2"],
+              "excluded": ["ab_neg", "ab_neg_2"]
+            }
+          },
+          {
+            "binds": ["b", "a"],
+            "tags": {
+              "included": ["ba_pos"],
+              "excluded": ["ba_neg"]
+            }
+          },
+          {
+            "binds": ["a", "c"],
+            "tags": { "included": ["ac_pos"], "excluded": [] }
+          }
+        ],
+        "post": [
+          {
+            "binds": ["a", "b"],
+            "tags": {
+              "included": ["ab_add"],
+              "excluded": ["ab_remove"]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -107,6 +107,27 @@ size_t test_utf8_encode(char *out_buffer, const char* in_buffer, size_t length)
 	return out_ptr - out_buffer;
 }
 
+void json_tags_state(Json_Writer *j, Sim_Info *sim_info, Tags_State *state)
+{
+	json_begin_object(j);
+
+	json_key_begin_array(j, "included");
+	for (U32 i = 0; i < state->included.count; i++) {
+		Tag_Info *tag = &sim_info->tag_infos[state->included.tags[i]];
+		json_string(j, tag->name.string);
+	}
+	json_end_array(j);
+
+	json_key_begin_array(j, "excluded");
+	for (U32 i = 0; i < state->excluded.count; i++) {
+		Tag_Info *tag = &sim_info->tag_infos[state->excluded.tags[i]];
+		json_string(j, tag->name.string);
+	}
+	json_end_array(j);
+
+	json_end_object(j);
+}
+
 void json_test_sim_info(Json_Writer *j, Sim_Info *sim_info)
 {
 	json_begin_object(j);
@@ -127,36 +148,44 @@ void json_test_sim_info(Json_Writer *j, Sim_Info *sim_info)
 
 			json_key_begin_object(j, bind->name.string);
 
-			json_key_begin_array(j, "required");
-			for (U32 i = 0; i < bind->pre.required_tag_count; i++) {
-				Tag_Info *tag_info = &sim_info->tag_infos[bind->pre.required_tags[i]];
-				json_string(j, tag_info->name.string);
-			}
-			json_end_array(j);
+			json_key(j, "pre");
+			json_tags_state(j, sim_info, &rule->pre_state.bind_states[bind_index]);
 
-			json_key_begin_array(j, "prohibited");
-			for (U32 i = 0; i < bind->pre.prohibited_tag_count; i++) {
-				Tag_Info *tag_info = &sim_info->tag_infos[bind->pre.prohibited_tags[i]];
-				json_string(j, tag_info->name.string);
-			}
-			json_end_array(j);
-
-			json_key_begin_array(j, "adds");
-			for (U32 i = 0; i < bind->post.required_tag_count; i++) {
-				Tag_Info *tag_info = &sim_info->tag_infos[bind->post.required_tags[i]];
-				json_string(j, tag_info->name.string);
-			}
-			json_end_array(j);
-
-			json_key_begin_array(j, "removes");
-			for (U32 i = 0; i < bind->post.prohibited_tag_count; i++) {
-				Tag_Info *tag_info = &sim_info->tag_infos[bind->post.prohibited_tags[i]];
-				json_string(j, tag_info->name.string);
-			}
-			json_end_array(j);
-
+			json_key(j, "post");
+			json_tags_state(j, sim_info, &rule->post_state.bind_states[bind_index]);
 
 			json_end_object(j);
+		}
+
+		json_end_object(j);
+
+		json_key_begin_object(j, "rels");
+
+		String rel_keys[] = { c_string("pre"), c_string("post") };
+		Rule_State *states[] = { &rule->pre_state, &rule->post_state };
+
+		for (U32 state_index = 0; state_index < 2; state_index++) {
+			Rule_State *state = states[state_index];
+
+			json_key_begin_array(j, rel_keys[state_index]);
+
+			for (U32 rel_index = 0; rel_index < state->rel_state_count; rel_index++) {
+				Rel_State *rel = state->rel_states + rel_index;
+
+				json_begin_object(j);
+
+				json_key_begin_array(j, "binds");
+				json_string(j, rule->binds[rel->first_bind_id].name.string);
+				json_string(j, rule->binds[rel->second_bind_id].name.string);
+				json_end_array(j);
+
+				json_key(j, "tags");
+				json_tags_state(j, sim_info, &rel->tags);
+
+				json_end_object(j);
+			}
+
+			json_end_array(j);
 		}
 
 		json_end_object(j);
@@ -177,8 +206,10 @@ size_t test_sim_parse(char *out_buffer, const char* in_buffer, size_t length)
 	Sim_Info sim_info = { 0 };
 	bool success = parse_rules(&sim_info, &s);
 
+	char *json_buffer = M_ALLOC(char, TEST_BUFFER_SIZE);
+
 	Json_Writer json;
-	json_init(&json, out_buffer, TEST_BUFFER_SIZE);
+	json_init(&json, json_buffer, TEST_BUFFER_SIZE);
 
 	if (success) {
 		json_test_sim_info(&json, &sim_info);
@@ -187,7 +218,12 @@ size_t test_sim_parse(char *out_buffer, const char* in_buffer, size_t length)
 		json_null(&json);
 	}
 
-	return json_length(&json);
+	size_t js_length = json_length(&json);
+	size_t formatted_length = format_json(out_buffer, TEST_BUFFER_SIZE, json_buffer, js_length);
+
+	M_FREE(json_buffer);
+
+	return formatted_length;
 }
 
 Test_Def test_defs[] = {
