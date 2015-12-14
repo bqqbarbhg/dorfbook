@@ -24,6 +24,7 @@
 #include "gzip/compress_search.cpp"
 #include "gzip/deflate.cpp"
 #include "random.cpp"
+#include "sim/sim.cpp"
 #include "sim/sim_parse.cpp"
 #include "assets.cpp"
 #include "dorf.cpp"
