@@ -281,3 +281,11 @@ bool parse_rules(Sim_Info *sim_info, Scanner *s)
 	return ret;
 }
 
+bool parse_rules(Sim_Info *sim_info, const char *data, size_t size)
+{
+	Scanner s;
+	s.pos = data;
+	s.end = data + size;
+	return parse_rules(sim_info, &s);
+}
+

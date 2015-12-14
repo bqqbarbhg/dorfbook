@@ -68,3 +68,20 @@ void sim_info_free(Sim_Info *sim_info)
 	string_table_free(&sim_info->string_table);
 }
 
+Tag_Id find_tag(Sim_Info *info, String str)
+{
+	Interned_String interned;
+	if (!intern_if_not_new(&interned, &info->string_table, str)) return 0;
+	U32 count = info->tag_info_count;
+	for (U32 i = 1; i < count; i++) {
+		if (info->tag_infos[i].name == interned)
+			return i;
+	}
+	return 0;
+}
+
+Tag_Id find_tag(Sim_Info *info, const char *str)
+{
+	return find_tag(info, c_string(str));
+}
+

@@ -26,6 +26,7 @@
 #include "random.cpp"
 #include "sim/sim.cpp"
 #include "sim/sim_parse.cpp"
+#include "sim/sim_world.cpp"
 #include "assets.cpp"
 #include "dorf.cpp"
 #include "test_call.cpp"

@@ -355,10 +355,48 @@ int render_allocation(char *body, U64 serial)
 #endif
 }
 
+int render_sim_world(char *body, Sim_World *w)
+{
+	char *temp_buffer = M_ALLOC(char, 1024*1024);
+	Json_Writer json_writer, *j = &json_writer;
+	json_init(j, temp_buffer, 1024*1024);
+
+	json_begin_object(j);
+
+	json_key_begin_array(j, "entities");
+
+	for (U32 i = 0; i < w->entity_count; i++) {
+		Sim_Entity *entity = w->entities + i;
+		if (!entity->id) continue;
+
+		json_begin_object(j);
+
+		json_key_begin_array(j, "tags");
+		for (U32 i = 0; i < entity->tag_count; i++) {
+			Tag_Id tag_id = entity->tags[i];
+			Tag_Info *tag_info = w->info->tag_infos + tag_id;
+			json_string(j, tag_info->name.string);
+		}
+		json_end_array(j);
+
+		json_end_object(j);
+	}
+
+	json_end_array(j);
+
+	json_end_object(j);
+
+	format_json(body, 1024 * 1024, temp_buffer, json_length(j));
+	M_FREE(temp_buffer);
+
+	return 200;
+}
+
 struct Response_Thread_Data
 {
 	os_socket client_socket;
 	World_Instance *world_instance;
+	Sim_World *sim_world;
 	char *body_storage;
 	int thread_id;
 };
@@ -535,6 +573,7 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 	Response_Thread_Data *data = (Response_Thread_Data*)thread_data;
 	os_socket client_socket = data->client_socket;
 	World_Instance *world_instance = data->world_instance;
+	Sim_World *sim_world = data->sim_world;
 	char *body = data->body_storage;
 
 	os_atomic_increment(&active_thread_count);
@@ -685,6 +724,12 @@ OS_THREAD_ENTRY(thread_do_response, thread_data)
 
 			send_text_response(client_socket, "text/html", status, body);
 
+		} else if (!strcmp(path, "/sim")) {
+
+			int status = render_sim_world(body, sim_world);
+
+			send_text_response(client_socket, "application/json", status, body);
+
 		} else if (sscanf(path, "/test/%s", test_name) == 1) {
 
 			char *in_buffer = M_ALLOC(char, TEST_BUFFER_SIZE);
@@ -833,16 +878,38 @@ int main(int argc, char **argv)
 
 	FILE *face_xml_file = fopen("data/faces.svg", "r");
 	size_t num_bytes = fread(face_xml_data, 1, sizeof(face_xml_data), face_xml_file);
+	fclose(face_xml_file);
 
 	if (!parse_xml(&assets.faces.xml, face_xml_data, num_bytes)) {
 		puts("Failed to parse face SVG");
 	}
 
-	fclose(face_xml_file);
-
 	initialize_id_list(&assets.faces);
 
 	world.assets = &assets;
+
+	static char rules_data[1024*1024];
+
+	FILE *rules_file = fopen("data/rules.md", "r");
+	size_t rules_num_bytes = fread(rules_data, 1, sizeof(rules_data), rules_file);
+	fclose(rules_file);
+
+	Sim_Info info = { 0 };
+
+	if (!parse_rules(&info, rules_data, rules_num_bytes)) {
+		puts("Failed to parse rules");
+	}
+
+	Sim_World sim_world = { 0 };
+	sim_world_allocate(&sim_world);
+	sim_world_create(&sim_world, &info);
+
+	for (U32 i = 0; i < 10; i++) {
+		Tag_Id tags[] = {
+			find_tag(sim_world.info, "dwarf"),
+		};
+		sim_create_entity(&sim_world, tags, Count(tags));
+	}
 
 	World_Instance world_instance = { 0 };
 	world_instance.last_updated = time(NULL);
@@ -870,6 +937,7 @@ int main(int argc, char **argv)
 		Response_Thread_Data *thread_data = M_ALLOC(Response_Thread_Data, 1);
 		thread_data->client_socket = client_socket;
 		thread_data->world_instance = &world_instance;
+		thread_data->sim_world = &sim_world;
 		thread_data->body_storage = M_ALLOC(char, 1024*1024);
 		thread_data->thread_id = ++thread_id;
 

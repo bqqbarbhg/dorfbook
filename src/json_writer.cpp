@@ -651,7 +651,13 @@ size_t format_json(char *output, size_t output_size,
 	if (!format_json(&formatter, input, input + input_size))
 		return 0;
 
-	return formatter.out - formatter.out_buffer;
+	size_t written = formatter.out - formatter.out_buffer;
+	if (written == output_size)
+		return 0;
+
+	output[written] = '\0';
+
+	return written;
 }
 
 size_t format_json(char *output, size_t output_size, const char *input, size_t input_size)
