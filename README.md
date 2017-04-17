@@ -1,6 +1,8 @@
 Dorfbook
 ========
 
+[![Join the chat at https://gitter.im/bqqbarbhg/dorfbook](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/bqqbarbhg/dorfbook?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![Build Status](https://travis-ci.org/bqqbarbhg/dorfbook.svg?branch=master)](https://travis-ci.org/bqqbarbhg/dorfbook)
 
 Virtual social media for following dwarven mischief.
